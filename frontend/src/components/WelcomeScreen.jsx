@@ -1,51 +1,55 @@
 /**
- * Welcome screen from Onboarding Flow Design.
- * Shown once before the route finder (Get started → main app).
+ * Welcome screen — MIRA Commute Companion design.
+ * First screen in onboarding: logo, train illustration, headline, Get started / Skip.
  */
-export function WelcomeScreen({ onGetStarted }) {
-  return (
-    <div className="h-dvh min-h-dvh max-h-dvh overflow-hidden bg-[#F7F3EE] flex flex-col px-6 pt-4 pb-8 sm:pt-6 sm:pb-12">
-      {/* Main content — centered vertically in available space */}
-      <div className="flex-1 flex flex-col justify-center shrink-0 min-h-0">
-        {/* Illustration */}
-        <div className="mb-4 sm:mb-6">
-          <svg width="200" height="140" viewBox="0 0 200 140" className="mx-auto" aria-hidden>
-            <circle cx="100" cy="70" r="35" fill="#F7D97A" opacity="0.6" />
-            <circle cx="100" cy="70" r="25" fill="#F7D97A" />
-            <rect x="60" y="85" width="80" height="32" rx="8" fill="#BFD7EA" />
-            <rect x="65" y="90" width="16" height="12" rx="3" fill="#1A1A1A" opacity="0.1" />
-            <rect x="85" y="90" width="16" height="12" rx="3" fill="#1A1A1A" opacity="0.1" />
-            <rect x="105" y="90" width="16" height="12" rx="3" fill="#1A1A1A" opacity="0.1" />
-            <rect x="125" y="90" width="16" height="12" rx="3" fill="#1A1A1A" opacity="0.1" />
-            <circle cx="75" cy="117" r="5" fill="#1A1A1A" />
-            <circle cx="95" cy="117" r="5" fill="#1A1A1A" />
-            <circle cx="105" cy="117" r="5" fill="#1A1A1A" />
-            <circle cx="125" cy="117" r="5" fill="#1A1A1A" />
-            <path d="M155 75 C155 70, 160 65, 165 65 C170 65, 175 70, 175 75 C175 82, 165 92, 165 92 C165 92, 155 82, 155 75 Z" fill="#F2B5C4" />
-            <circle cx="165" cy="75" r="3" fill="#fff" />
-          </svg>
-        </div>
+import trainSunrise from '../assets/train-sunrise.png'
+import miraLogo from '../assets/mira-logo.png'
 
-        {/* Text */}
-        <div className="text-center mb-6 sm:mb-8">
-          <h2 className="text-[28px] sm:text-[32px] leading-tight text-[#1A1A1A] mb-2 sm:mb-3 px-2 sm:px-4">
-            Make Idle Rides Amazing
-          </h2>
-          <p className="text-sm sm:text-base text-[#6B6B6B] px-2 sm:px-4">
-            Personalized learning during your commute.
-          </p>
-        </div>
+export function WelcomeScreen({ onGetStarted, onSkip }) {
+  return (
+    <div className="h-dvh min-h-dvh max-h-dvh overflow-hidden flex flex-col px-6 pt-12 pb-10 bg-[#F7F3EE]">
+      {/* Top Logo */}
+      <div className="shrink-0">
+        <img src={miraLogo} alt="MIRA" className="h-8 w-auto" />
       </div>
 
-      {/* CTA — anchored at bottom */}
-      <div className="shrink-0 pt-4 sm:pt-6">
+      {/* Center Content */}
+      <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+        <div className="mb-10">
+          <img
+            src={trainSunrise}
+            alt="Train with sunrise"
+            className="w-36 h-36 object-contain mx-auto"
+          />
+        </div>
+        <h1 className="text-[2rem] leading-[1.2] font-bold text-center mb-4 text-[#1F1F1F] tracking-tight">
+          Make Idle Rides
+          <br />
+          Amazing
+        </h1>
+        <p className="text-base text-[#8B8B8B] text-center max-w-[280px]">
+          Personalized learning during your commute.
+        </p>
+      </div>
+
+      {/* Bottom CTAs */}
+      <div className="shrink-0 space-y-4 pt-2">
         <button
           type="button"
           onClick={onGetStarted}
-          className="w-full bg-[#1A1A1A] text-white py-4 rounded-full transition-all active:scale-[0.98] font-medium"
+          className="w-full h-14 px-8 py-4 rounded-full bg-[#1F1F1F] text-white font-semibold text-base shadow-lg hover:bg-[#2A2A2A] hover:shadow-xl transition-all duration-200 active:scale-[0.98]"
         >
           Get started
         </button>
+        {onSkip && (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="w-full py-3 text-center text-[#8B8B8B] text-base font-medium"
+          >
+            Skip
+          </button>
+        )}
       </div>
     </div>
   )

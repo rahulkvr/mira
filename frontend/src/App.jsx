@@ -2,6 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { WelcomeScreen } from './components/WelcomeScreen.jsx'
 import { ChooseCityScreen } from './components/ChooseCityScreen.jsx'
 import { SavePlacesScreen } from './components/SavePlacesScreen.jsx'
+import { EmailScreen } from './components/EmailScreen.jsx'
+import { InterestsScreen } from './components/InterestsScreen.jsx'
+import { SuccessScreen } from './components/SuccessScreen.jsx'
+import { AppHeader } from './components/AppHeader.jsx'
+import { BottomNavigation } from './components/BottomNavigation.jsx'
+import { ExploreTab } from './components/ExploreTab.jsx'
+import { ProfileTab } from './components/ProfileTab.jsx'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 // Set to true to always show welcome on load (for editing). Set to false and use key below to show once.
@@ -157,38 +164,57 @@ function getLineStyle(line) {
 
 function RouteOption({ schedule }) {
   const elements = schedule.scheduleElements || []
+  const totalMin = schedule.time
+  const walkMin = schedule.footpathTime || 0
+  const ticket = schedule.tickets?.[0]
 
   return (
-    <article className="rounded-3xl border-2 border-[#E8E3DD] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-      <div className="mb-3 text-[#6B6B6B] text-sm font-medium">
-        {schedule.time} min
-        {schedule.footpathTime > 0 && ` • ${schedule.footpathTime} min walk`}
+    <article className="rounded-3xl bg-white shadow-lg border border-gray-50 p-5 transition-all hover:shadow-xl active:scale-[0.99]">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span className="text-xl font-bold text-[#1F1F1F]">{totalMin} min</span>
+          </div>
+          {walkMin > 0 && (
+            <span className="text-sm text-gray-500 border-l border-gray-200 pl-3">{walkMin} min walk</span>
+          )}
+        </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {elements.map((el, i) => {
           const style = getLineStyle(el.line)
+          const timeRange = el.from?.depTime && el.to?.arrTime ? `${formatTime(el.from.depTime)} – ${formatTime(el.to.arrTime)}` : null
           return (
-            <div key={i} className="flex items-center gap-3 text-sm">
+            <div key={i} className="flex items-center gap-3">
               <span
-                className="min-w-[2.75rem] rounded px-2 py-1 text-center text-sm font-bold text-white"
+                className="min-w-[52px] px-2.5 py-1.5 rounded-lg text-center text-xs font-bold text-white shrink-0"
                 style={{ backgroundColor: style.bg, color: style.fg }}
               >
                 {style.label}
               </span>
-              <span className="text-[#1A1A1A] font-medium">
-                {el.from?.name} → {el.to?.name}
-              </span>
-              <span className="text-[#6B6B6B]">
-                {formatTime(el.from?.depTime)} – {formatTime(el.to?.arrTime)}
-              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-[#1F1F1F] truncate">
+                  {el.from?.name} → {el.to?.name}
+                </p>
+              </div>
+              {timeRange && (
+                <span className="text-xs text-gray-500 font-medium shrink-0">{timeRange}</span>
+              )}
             </div>
           )
         })}
       </div>
-      {schedule.tickets?.length > 0 && (
-        <p className="mt-2 text-xs text-[#6B6B6B]">
-          Ticket: {schedule.tickets[0].type} {schedule.tickets[0].price != null && `(€${schedule.tickets[0].price})`}
-        </p>
+      {ticket && (
+        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+          <span className="text-xs text-gray-500">{ticket.type}</span>
+          <span className="text-sm font-semibold text-[#1F1F1F]">
+            {ticket.price != null ? `€${ticket.price}` : ''}
+          </span>
+        </div>
       )}
     </article>
   )
@@ -207,7 +233,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState(() =>
     ALWAYS_SHOW_WELCOME ? 'welcome' : (localStorage.getItem(WELCOME_DONE_KEY) ? 'main' : 'welcome')
   )
-  // currentScreen: 'welcome' | 'city' | 'places' | 'main'
+  // currentScreen: 'welcome' | 'city' | 'places' | 'email' | 'interests' | 'success' | 'main'
   const [_selectedCity, setSelectedCity] = useState('')
   const [startQuery, setStartQuery] = useState('')
   const [endQuery, setEndQuery] = useState('')
@@ -219,9 +245,19 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [schedules, setSchedules] = useState([])
+  const [activeTab, setActiveTab] = useState('ride')
 
   const handleWelcomeDone = () => {
     setCurrentScreen('city')
+  }
+
+  const handleSkip = () => {
+    try { localStorage.setItem(WELCOME_DONE_KEY, '1') } catch (_) {}
+    setCurrentScreen('main')
+  }
+
+  const handleCityBack = () => {
+    setCurrentScreen('welcome')
   }
 
   const handleCityContinue = (city) => {
@@ -229,7 +265,31 @@ export default function App() {
     setCurrentScreen('places')
   }
 
-  const handlePlacesContinue = () => {
+  const handlePlacesBack = () => {
+    setCurrentScreen('city')
+  }
+
+  const handlePlacesContinue = (places) => {
+    setCurrentScreen('email')
+  }
+
+  const handleEmailBack = () => {
+    setCurrentScreen('places')
+  }
+
+  const handleEmailContinue = (email) => {
+    setCurrentScreen('interests')
+  }
+
+  const handleInterestsBack = () => {
+    setCurrentScreen('email')
+  }
+
+  const handleInterestsComplete = (interests) => {
+    setCurrentScreen('success')
+  }
+
+  const handleSuccessStartRide = () => {
     setCurrentScreen('main')
     if (!ALWAYS_SHOW_WELCOME) {
       try {
@@ -238,6 +298,10 @@ export default function App() {
         // Ignore localStorage errors
       }
     }
+  }
+
+  const handleSuccessEditPreferences = () => {
+    setCurrentScreen('city')
   }
 
   const hasStart = (startSelected && startSelected.id) || startQuery.trim()
@@ -286,136 +350,231 @@ export default function App() {
   }
 
   if (currentScreen === 'welcome') {
-    return <WelcomeScreen onGetStarted={handleWelcomeDone} />
+    return <WelcomeScreen onGetStarted={handleWelcomeDone} onSkip={handleSkip} />
   }
 
   if (currentScreen === 'city') {
-    return <ChooseCityScreen onContinue={handleCityContinue} />
+    return <ChooseCityScreen onContinue={handleCityContinue} onBack={handleCityBack} />
   }
 
   if (currentScreen === 'places') {
-    return <SavePlacesScreen onContinue={handlePlacesContinue} />
+    return (
+      <SavePlacesScreen
+        onContinue={handlePlacesContinue}
+        onBack={handlePlacesBack}
+        city={_selectedCity || 'Hamburg'}
+      />
+    )
+  }
+
+  if (currentScreen === 'email') {
+    return (
+      <EmailScreen
+        onContinue={handleEmailContinue}
+        onBack={handleEmailBack}
+      />
+    )
+  }
+
+  if (currentScreen === 'interests') {
+    return (
+      <InterestsScreen
+        onComplete={handleInterestsComplete}
+        onBack={handleInterestsBack}
+      />
+    )
+  }
+
+  if (currentScreen === 'success') {
+    return (
+      <SuccessScreen
+        onStartRide={handleSuccessStartRide}
+        onEditPreferences={handleSuccessEditPreferences}
+      />
+    )
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F3EE] relative overflow-hidden">
-      {/* Decorative shape (match Choose City) */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-[#BFE6D3] rounded-bl-[80px] opacity-40" aria-hidden />
-      <div className="relative z-10 mx-auto max-w-lg px-6 py-12">
-        <header className="mb-8">
-          <h1 className="text-[32px] leading-[1.2] text-[#1A1A1A]">
-            Where are you<br />headed today?
-          </h1>
-        </header>
+    <div className="min-h-screen bg-[#FFF8F0]">
+      <AppHeader onProfileClick={() => setActiveTab('profile')} />
+      <div className="pb-24">
+        {activeTab === 'ride' && (
+          <div className="min-h-screen bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFFDF9] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-72 h-72 rounded-full bg-gradient-to-br from-[#FFE9A8]/30 to-[#FFCF6B]/20 blur-3xl pointer-events-none" aria-hidden />
+            <div className="absolute top-40 -left-20 w-48 h-48 rounded-full bg-gradient-to-br from-[#B5E8D4]/25 to-[#9BC4DC]/15 blur-3xl pointer-events-none" aria-hidden />
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <StationInput
-            id="start"
-            placeholder="Starting point"
-            value={startQuery}
-            selected={startSelected}
-            onSelect={(r) => {
-              setStartSelected(r)
-              setStartQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
-            }}
-            onChange={(v) => { setStartQuery(v); setStartSelected(null) }}
-            disabled={loading}
-            dark={false}
-          />
-          <div className="flex justify-center -my-1">
-            <button
-              type="button"
-              onClick={swapStartEnd}
-              disabled={loading}
-              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#E8E3DD] bg-white text-[#6B6B6B] shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition hover:border-[#1A1A1A] hover:text-[#1A1A1A] disabled:opacity-50"
-              title="Swap start and destination"
-              aria-label="Swap start and destination"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-              </svg>
-            </button>
-          </div>
-          <StationInput
-            id="end"
-            placeholder="Drop me here"
-            value={endQuery}
-            selected={endSelected}
-            onSelect={(r) => {
-              setEndSelected(r)
-              setEndQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
-            }}
-            onChange={(v) => { setEndQuery(v); setEndSelected(null) }}
-            disabled={loading}
-            dark
-            variant="destination"
-          />
-          <div className="flex flex-nowrap items-center gap-2 pt-1">
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              disabled={loading}
-              className="min-w-0 flex-1 rounded-3xl border-2 border-[#E8E3DD] bg-white px-3 py-2.5 text-sm font-medium text-[#1A1A1A] shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus:border-[#1A1A1A] focus:outline-none"
-            />
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              disabled={loading}
-              className="min-w-0 flex-1 rounded-3xl border-2 border-[#E8E3DD] bg-white px-3 py-2.5 text-sm font-medium text-[#1A1A1A] shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus:border-[#1A1A1A] focus:outline-none"
-            />
-            <div className="flex shrink-0 rounded-3xl border-2 border-[#E8E3DD] bg-white p-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <button
-                type="button"
-                onClick={() => setTimeIsDeparture(true)}
-                disabled={loading}
-                className={`rounded-3xl px-3 py-2 text-sm font-medium transition whitespace-nowrap ${timeIsDeparture ? 'bg-[#F7D97A] text-[#1A1A1A] shadow-[0_2px_12px_rgba(247,217,122,0.3)]' : 'text-[#6B6B6B] hover:text-[#1A1A1A]'}`}
-              >
-                Departure
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimeIsDeparture(false)}
-                disabled={loading}
-                className={`rounded-3xl px-3 py-2 text-sm font-medium transition whitespace-nowrap ${!timeIsDeparture ? 'bg-[#F7D97A] text-[#1A1A1A] shadow-[0_2px_12px_rgba(247,217,122,0.3)]' : 'text-[#6B6B6B] hover:text-[#1A1A1A]'}`}
-              >
-                Arrival
-              </button>
+            <div className="px-5 pt-4 pb-6 relative z-10">
+              <header className="mb-6">
+                <h1 className="text-2xl font-bold text-[#1F1F1F]">Where are you going?</h1>
+              </header>
+
+              {/* Departure/Arrival toggle — Commute Companion style */}
+              <div className="mb-5">
+                <div className="inline-flex bg-white rounded-full p-1 shadow-sm border border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setTimeIsDeparture(true)}
+                    disabled={loading}
+                    className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${timeIsDeparture ? 'bg-[#1F1F1F] text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Departure
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTimeIsDeparture(false)}
+                    disabled={loading}
+                    className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${!timeIsDeparture ? 'bg-[#1F1F1F] text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Arrival
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-0">
+                {/* Route input card — Commute Companion style */}
+                <div className="rounded-3xl bg-white shadow-lg border border-gray-50 p-5 space-y-4 mb-5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#E0F5ED] to-[#B8E8D4] flex items-center justify-center shrink-0">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#1F1F1F]" aria-hidden />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-0.5">From</p>
+                      <StationInput
+                        id="start"
+                        placeholder="Current location"
+                        value={startQuery}
+                        selected={startSelected}
+                        onSelect={(r) => {
+                          setStartSelected(r)
+                          setStartQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
+                        }}
+                        onChange={(v) => { setStartQuery(v); setStartSelected(null) }}
+                        disabled={loading}
+                        dark={false}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 py-1">
+                    <div className="w-10 flex justify-center shrink-0">
+                      <div className="flex flex-col gap-1">
+                        <span className="w-1 h-1 rounded-full bg-gray-300 block" />
+                        <span className="w-1 h-1 rounded-full bg-gray-300 block" />
+                        <span className="w-1 h-1 rounded-full bg-gray-300 block" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FFE4EC] to-[#FFCCD8] flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4 text-[#1F1F1F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-0.5">To</p>
+                      <StationInput
+                        id="end"
+                        placeholder="Where to?"
+                        value={endQuery}
+                        selected={endSelected}
+                        onSelect={(r) => {
+                          setEndSelected(r)
+                          setEndQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
+                        }}
+                        onChange={(v) => { setEndQuery(v); setEndSelected(null) }}
+                        disabled={loading}
+                        dark
+                        variant="destination"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={swapStartEnd}
+                      disabled={loading}
+                      className="shrink-0 p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-[#1F1F1F] transition-colors"
+                      title="Swap start and destination"
+                      aria-label="Swap start and destination"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Quick place chips */}
+                  <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                    {['Hamburg Hbf', 'Jungfernstieg', 'Altona', 'Harburg'].map((label) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => {
+                          setEndQuery(label)
+                          setEndSelected(null)
+                        }}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-br from-[#FFF5D6] to-[#FFE9A8] text-[#6B5900] hover:shadow-md transition-all"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Date & time row */}
+                <div className="flex flex-nowrap items-center gap-2 mb-5">
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    disabled={loading}
+                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-[#1F1F1F] shadow-sm focus:border-[#FFD56B] focus:ring-2 focus:ring-[#FFD56B] focus:ring-offset-2 focus:outline-none"
+                  />
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    disabled={loading}
+                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-[#1F1F1F] shadow-sm focus:border-[#FFD56B] focus:ring-2 focus:ring-[#FFD56B] focus:ring-offset-2 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`
+                    w-full h-14 rounded-full font-semibold text-base transition-all
+                    ${loading ? 'bg-[#E8E3DD] text-[#6B6B6B] cursor-not-allowed' : 'bg-[#1F1F1F] text-white shadow-lg hover:bg-[#2A2A2A] hover:shadow-xl active:scale-[0.98]'}
+                  `}
+                >
+                  {loading ? 'Searching…' : 'Find routes'}
+                </button>
+              </form>
+
+                {error && (
+                  <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+
+                {schedules.length > 0 && (
+                  <section className="space-y-4 pb-24">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-bold text-[#1F1F1F]">Available routes</h2>
+                      <span className="text-sm text-gray-500">{schedules.length} options</span>
+                    </div>
+                    {schedules.map((schedule, i) => (
+                      <RouteOption key={schedule.routeId ?? i} schedule={schedule} index={i} />
+                    ))}
+                  </section>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className={`
-                w-full rounded-full py-4 font-bold transition relative z-10
-                ${loading
-                  ? 'bg-[#E8E3DD] text-[#6B6B6B] cursor-not-allowed'
-                  : 'bg-[#1A1A1A] text-white active:scale-[0.98] hover:opacity-90'}
-              `}
-            >
-              {loading ? 'Loading…' : 'Find routes'}
-            </button>
-          </div>
-        </form>
-
-        {error && (
-          <div className="mb-6 rounded-3xl border-2 border-[#E8E3DD] bg-white px-5 py-4 text-sm text-[#1A1A1A] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-            {error}
-          </div>
         )}
-
-        {schedules.length > 0 && (
-          <section className="mt-8">
-            <div className="space-y-4">
-              {schedules.map((schedule, i) => (
-                <RouteOption key={schedule.routeId ?? i} schedule={schedule} index={i} />
-              ))}
-            </div>
-          </section>
-        )}
+        {activeTab === 'explore' && <ExploreTab />}
+        {activeTab === 'profile' && <ProfileTab />}
       </div>
+      <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   )
 }
