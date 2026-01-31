@@ -39,8 +39,18 @@ function CheckIcon({ className }) {
   )
 }
 
+function UserIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  )
+}
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 8
+const MIN_NAME_LENGTH = 2
 
 function LockIcon({ className }) {
   return (
@@ -51,20 +61,30 @@ function LockIcon({ className }) {
   )
 }
 
-export function EmailScreen({ onContinue, onSkip, onBack }) {
+export function EmailScreen({ onContinue, onSkip, onBack, errorMessage }) {
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [nameTouched, setNameTouched] = useState(false)
   const [touched, setTouched] = useState(false)
   const [passwordTouched, setPasswordTouched] = useState(false)
 
+  const isValidName = displayName.trim().length >= MIN_NAME_LENGTH
   const isValidEmail = EMAIL_REGEX.test(email.trim())
   const isValidPassword = password.length >= MIN_PASSWORD_LENGTH
+  const showNameError = nameTouched && !isValidName && displayName.length > 0
   const showEmailError = touched && !isValidEmail && email.length > 0
   const showPasswordError = passwordTouched && !isValidPassword && password.length > 0
-  const canContinue = isValidEmail && isValidPassword
+  const canContinue = isValidName && isValidEmail && isValidPassword
 
   const handleContinue = () => {
-    if (canContinue) onContinue(email.trim(), password)
+    if (canContinue) {
+      onContinue({
+        email: email.trim(),
+        password,
+        displayName: displayName.trim(),
+      })
+    }
   }
 
   return (
@@ -89,6 +109,38 @@ export function EmailScreen({ onContinue, onSkip, onBack }) {
         <p className="text-sm text-gray-500">
           We&apos;ll use this to save your preferences and sync across devices.
         </p>
+      </div>
+
+      {/* Name Input */}
+      <div className="mb-4 relative z-10 shrink-0">
+        <div className="relative">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+            <UserIcon className="w-[18px] h-[18px]" />
+          </div>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            onBlur={() => setNameTouched(true)}
+            placeholder="Your name"
+            className={`
+              flex h-14 w-full rounded-2xl border bg-white pl-12 pr-4 py-3 text-[15px] font-medium
+              placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all shadow-sm
+              ${showNameError
+                ? 'border-red-400 focus:ring-red-300'
+                : isValidName && displayName.trim()
+                  ? 'border-green-400 focus:ring-green-300'
+                  : 'border-gray-200 focus:ring-[#FFD56B] focus:border-transparent'
+              }
+            `}
+          />
+        </div>
+        {showNameError && (
+          <p className="flex items-center gap-1.5 mt-2 text-sm text-red-500">
+            <AlertCircleIcon className="w-3.5 h-3.5 shrink-0" />
+            Please enter your name
+          </p>
+        )}
       </div>
 
       {/* Email Input */}
@@ -180,6 +232,12 @@ export function EmailScreen({ onContinue, onSkip, onBack }) {
           </p>
         )}
       </div>
+
+      {errorMessage && (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 relative z-10">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Info card */}
       <div className="mb-6 relative z-10 shrink-0">

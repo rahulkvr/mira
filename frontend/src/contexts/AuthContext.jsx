@@ -51,11 +51,15 @@ export function AuthProvider({ children }) {
         }
         return supabase.auth.signInWithPassword({ email, password })
       },
-      signUpWithPassword: async ({ email, password }) => {
+      signUpWithPassword: async ({ email, password, displayName }) => {
         if (!hasSupabaseConfig || !supabase) {
           return { data: null, error: new Error('Supabase is not configured.') }
         }
-        return supabase.auth.signUp({ email, password })
+        return supabase.auth.signUp({
+          email,
+          password,
+          options: displayName ? { data: { name: displayName } } : undefined,
+        })
       },
       signOut: async () => {
         if (!hasSupabaseConfig || !supabase) {

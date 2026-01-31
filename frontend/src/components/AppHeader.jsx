@@ -10,7 +10,7 @@ function UserIcon({ className }) {
   )
 }
 
-export function AppHeader({ onProfileClick }) {
+export function AppHeader({ onProfileClick, userName }) {
   return (
     <header className="sticky top-0 z-40 bg-[#FFF8F0]/95 backdrop-blur-sm px-5 py-4 flex items-center justify-between">
       <div className="flex items-center gap-2">
@@ -23,10 +23,15 @@ export function AppHeader({ onProfileClick }) {
         <button
           type="button"
           onClick={onProfileClick}
-          className="w-10 h-10 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-2 rounded-full bg-white shadow-sm border border-gray-100 px-3 py-2 hover:bg-gray-50 transition-colors"
           aria-label="Open profile"
         >
           <UserIcon className="w-[18px] h-[18px] text-gray-600" />
+          {userName && (
+            <span className="text-sm font-semibold text-[#1F1F1F] max-w-[120px] truncate">
+              {userName}
+            </span>
+          )}
         </button>
       )}
     </header>

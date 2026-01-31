@@ -10,6 +10,7 @@ import { AppHeader } from './components/AppHeader.jsx'
 import { BottomNavigation } from './components/BottomNavigation.jsx'
 import { ExploreTab } from './components/ExploreTab.jsx'
 import { ProfileTab } from './components/ProfileTab.jsx'
+import { useAuth } from './contexts/AuthContext.jsx'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 // Set to true to always show welcome on load (for editing). Set to false and use key below to show once.
@@ -231,6 +232,7 @@ function nowTimeStr() {
 }
 
 export default function App() {
+  const { signInWithPassword, signUpWithPassword, user, loading: authLoading } = useAuth()
   const [currentScreen, setCurrentScreen] = useState(() =>
     ALWAYS_SHOW_WELCOME ? 'welcome' : (localStorage.getItem(WELCOME_DONE_KEY) ? 'main' : 'welcome')
   )
@@ -245,8 +247,21 @@ export default function App() {
   const [timeIsDeparture, setTimeIsDeparture] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [signInError, setSignInError] = useState(null)
+  const [signUpError, setSignUpError] = useState(null)
   const [schedules, setSchedules] = useState([])
   const [activeTab, setActiveTab] = useState('ride')
+
+  useEffect(() => {
+    if (authLoading) return
+    if (user) {
+      setCurrentScreen('main')
+      return
+    }
+    if (currentScreen === 'main') {
+      setCurrentScreen('welcome')
+    }
+  }, [authLoading, user, currentScreen])
 
   const handleWelcomeDone = () => {
     setCurrentScreen('city')
@@ -273,7 +288,13 @@ export default function App() {
     setCurrentScreen('places')
   }
 
-  const handleEmailContinue = (_email, _password) => {
+  const handleEmailContinue = async ({ email, password, displayName }) => {
+    setSignUpError(null)
+    const { error: authError } = await signUpWithPassword({ email, password, displayName })
+    if (authError) {
+      setSignUpError(authError.message || 'Could not sign up. Please try again.')
+      return
+    }
     setCurrentScreen('interests')
   }
 
@@ -285,7 +306,13 @@ export default function App() {
     setCurrentScreen('signin')
   }
 
-  const handleSignInSubmit = (_email, _password) => {
+  const handleSignInSubmit = async (email, password) => {
+    setSignInError(null)
+    const { error: authError } = await signInWithPassword({ email, password })
+    if (authError) {
+      setSignInError(authError.message || 'Could not sign in. Please try again.')
+      return
+    }
     setCurrentScreen('main')
     if (!ALWAYS_SHOW_WELCOME) {
       try {
@@ -373,7 +400,7 @@ export default function App() {
   }
 
   if (currentScreen === 'signin') {
-    return <SignInScreen onSignIn={handleSignInSubmit} onBack={handleSignInBack} />
+    return <SignInScreen onSignIn={handleSignInSubmit} onBack={handleSignInBack} errorMessage={signInError} />
   }
 
   if (currentScreen === 'city') {
@@ -396,6 +423,7 @@ export default function App() {
         onContinue={handleEmailContinue}
         onSkip={handleEmailSkip}
         onBack={handleEmailBack}
+        errorMessage={signUpError}
       />
     )
   }
@@ -418,9 +446,11 @@ export default function App() {
     )
   }
 
+  const displayName = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || ''
+
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
-      <AppHeader onProfileClick={() => setActiveTab('profile')} />
+      <AppHeader onProfileClick={() => setActiveTab('profile')} userName={displayName} />
       <div className="pb-24">
         {activeTab === 'ride' && (
           <div className="min-h-screen bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFFDF9] relative overflow-hidden">
