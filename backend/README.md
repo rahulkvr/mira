@@ -9,17 +9,21 @@ Node.js/Express backend for MIRA. Fetches transit routes from the **Geofox GTI A
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check. |
+| GET | `/api/stations?q=` | Station/stop autocomplete (HVV). |
+| GET | `/api/addresses?q=` | Address autocomplete (Nominatim, exact addresses e.g. Home/Work). |
 | POST | `/api/routes` | Get transit route options between two locations. |
 | GET / POST | `/api/announcements` | Get HVV transit announcements (disruptions, messages). |
 
 ### POST `/api/routes`
 
+Start and end can be **station names** (resolved via HVV) or **full addresses** (geocoded via Nominatim). Only resolved stations or coordinates are sent to Geofox; the exact address text is never sent.
+
 **Body (JSON):**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `start` | string or `{ name, city? }` | yes | Start location (e.g. `"Jungfernstieg"` or `{ "name": "Jungfernstieg", "city": "Hamburg" }`) |
-| `end` | string or `{ name, city? }` | yes | End location (e.g. `"Hamburg Hbf"`) |
+| `start` | string or `{ name, city? }` | yes | Start: station name (e.g. `"Jungfernstieg"`) or full address (e.g. `"Musterstraße 42, Hamburg"`) |
+| `end` | string or `{ name, city? }` | yes | End: station name or full address |
 | `time` | `{ date, time }` | no | When to travel. Default: now. `date`: `YYYY-MM-DD` or `DD.MM.YYYY`, `time`: `HH:mm` |
 | `timeIsDeparture` | boolean | no | `true` = time is departure (default), `false` = time is arrival |
 | `numberOfSchedules` | number | no | How many route options to return (default 10, max 20). |
@@ -35,6 +39,25 @@ curl -X POST http://localhost:3001/api/routes \
 **Success response (200):** `{ "success": true, "returnCode": "OK", "realtimeAffected": false, "schedules": [ ... ] }`
 
 **Errors:** `400` (missing/invalid start or end), `422` (no routes found), `503` (Geofox API/credentials issue).
+
+---
+
+### GET `/api/addresses`
+
+Address autocomplete for exact addresses (e.g. Home/Work). Uses Nominatim (OpenStreetMap). No auth.
+
+**Query:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `q` | string | Search query (min 3 chars for exact-address search; optional when `placeType` is set). |
+| `city` | string | Restrict results to city (e.g. `Hamburg`, `Berlin`, `Munich`). Required when using `placeType`. |
+| `placeType` | string | `gym` or `university` — search for gyms/universities in the city. When set, `q` can be empty (returns gyms/universities in city) or used to filter (e.g. `q=McFit` + `placeType=gym`). |
+
+**Example:** `GET /api/addresses?q=Mönckebergstraße%207&city=Hamburg`  
+**Example (gyms in city):** `GET /api/addresses?city=Hamburg&placeType=gym`
+
+**Success response (200):** `{ "results": [ { "display_name": "...", "lat": "...", "lon": "..." }, ... ] }`
 
 ---
 

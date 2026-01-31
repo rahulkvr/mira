@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { WelcomeScreen } from './components/WelcomeScreen.jsx'
+import { SignInScreen } from './components/SignInScreen.jsx'
 import { ChooseCityScreen } from './components/ChooseCityScreen.jsx'
 import { SavePlacesScreen } from './components/SavePlacesScreen.jsx'
 import { EmailScreen } from './components/EmailScreen.jsx'
@@ -251,11 +252,6 @@ export default function App() {
     setCurrentScreen('city')
   }
 
-  const handleSkip = () => {
-    try { localStorage.setItem(WELCOME_DONE_KEY, '1') } catch (_) {}
-    setCurrentScreen('main')
-  }
-
   const handleCityBack = () => {
     setCurrentScreen('welcome')
   }
@@ -269,7 +265,7 @@ export default function App() {
     setCurrentScreen('city')
   }
 
-  const handlePlacesContinue = (places) => {
+  const handlePlacesContinue = (_places) => {
     setCurrentScreen('email')
   }
 
@@ -277,15 +273,38 @@ export default function App() {
     setCurrentScreen('places')
   }
 
-  const handleEmailContinue = (email) => {
+  const handleEmailContinue = (_email, _password) => {
     setCurrentScreen('interests')
+  }
+
+  const handleEmailSkip = () => {
+    setCurrentScreen('interests')
+  }
+
+  const handleSignIn = () => {
+    setCurrentScreen('signin')
+  }
+
+  const handleSignInSubmit = (_email, _password) => {
+    setCurrentScreen('main')
+    if (!ALWAYS_SHOW_WELCOME) {
+      try {
+        localStorage.setItem(WELCOME_DONE_KEY, '1')
+      } catch {
+        // Ignore localStorage errors
+      }
+    }
+  }
+
+  const handleSignInBack = () => {
+    setCurrentScreen('welcome')
   }
 
   const handleInterestsBack = () => {
     setCurrentScreen('email')
   }
 
-  const handleInterestsComplete = (interests) => {
+  const handleInterestsComplete = (_interests) => {
     setCurrentScreen('success')
   }
 
@@ -350,7 +369,11 @@ export default function App() {
   }
 
   if (currentScreen === 'welcome') {
-    return <WelcomeScreen onGetStarted={handleWelcomeDone} onSkip={handleSkip} />
+    return <WelcomeScreen onGetStarted={handleWelcomeDone} onSignIn={handleSignIn} />
+  }
+
+  if (currentScreen === 'signin') {
+    return <SignInScreen onSignIn={handleSignInSubmit} onBack={handleSignInBack} />
   }
 
   if (currentScreen === 'city') {
@@ -371,6 +394,7 @@ export default function App() {
     return (
       <EmailScreen
         onContinue={handleEmailContinue}
+        onSkip={handleEmailSkip}
         onBack={handleEmailBack}
       />
     )
