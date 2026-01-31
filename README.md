@@ -1,50 +1,38 @@
-# Cursor 2-Day AI Hackathon — Repo Template
+# MIRA 🚇 — Make Idle Rides Amazing
 
-![Cursor 2-Day AI Hackathon](https://ai-beavers.com/_next/image?url=%2Fimages%2Fhackathon-hero-20012026.png&w=1920&q=75)
+**AI-powered experiences perfectly timed to your commute.**
 
-**How to use this template:**
-1. Click "Use this template" → "Create a new repository"
-2. Name your repo and set it to **Public**
-3. Replace this section with your project name and description
+MIRA transforms the "dead time" of daily transit into a tailored period of learning, relaxation, or entertainment. By syncing real-time public transit data with generative AI, MIRA creates high-quality, long-form content that fits your journey's exact duration and physical route.
+
+## 🚀 The Vision
+Commuting is the often the most unproductive part of any day. MIRA solves the "timing mismatch" of podcasts and books by generating a **Journey Stream**: a curated mix of audio/visual content that ends exactly when you arrive at your stop.
+
+## ✨ Key Features
+- **Temporal Sync**: Content is dynamically generated or chunked to fit your travel time (e.g., 8 mins on S-Bahn + 12 mins on U-Bahn).
+- **Hyper-Localization**: The AI narrator mentions landmarks and stations as you pass them.
+- **Intent Modes**:
+  - **Mastery**: Learn a new skill in commute-sized lessons.
+  - **Narrative**: Immersive stories set in the city you are traveling through.
+  - **Equilibrium**: Mindfulness and flow states designed to get you to your destination in the right mood (Focused, Calm, or Energized).
+- **Audio Dynamic**: Background music (via MiniMax) that matches the physical speed and vibe of the transit vehicle.
+
+## 🛠️ Technical Stack
+- **Frontend**: React / Vite / Tailwind CSS
+- **Backend**: Node.js / Express
+- **Core AI**: Google Gemini 2.0 (Logic & Scripts)
+- **Voice**: ElevenLabs API (Narrative Synthesis)
+- **Transit Intelligence**: HVV HAFAS / DB API
+- **Music**: MiniMax / Procedural Audio
+
+## 🗺️ MVP Roadmap (Hackathon Edition)
+1. **The Core (0-12h)**: Route fetching & journey block calculation.
+2. **The Intelligence (12-24h)**: Gemini-powered route-aware script generation.
+3. **The Vibe (24-36h)**: Glassmorphism UI & Journey Stream visualization.
+4. **The Final (36-48h)**: Speed-sync audio & Pitch preparation.
 
 ---
 
-# Project Name
+*“Turn your 20-minute S-Bahn ride into a 20-minute masterclass or a localized thriller where you are the protagonist.”*
 
-> One-line description of your project
+---
 
-## Tech Stack
-
-What technologies power your project?
-
-<!-- List your main technologies, frameworks, and services -->
-
-- **Frontend**: e.g., Next.js, React, Tailwind
-- **Backend**: e.g., Node.js, Python, FastAPI
-- **Database**: e.g., Supabase, Firebase, PostgreSQL
-- **AI/ML**: e.g., OpenAI GPT-4, Gemini Pro
-- **Hosting**: e.g., Vercel, Railway
-
-## How to Run
-
-Step-by-step instructions to run the project locally, including everything that needs to be set up.
-
-```bash
-# Clone the repo
-git clone https://github.com/your-team/your-project.git
-cd your-project
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Add your API keys to .env
-
-# Run the development server
-npm run dev
-```
-
-## Details
-
-Add anything else you want to share: architecture diagrams, screenshots, challenges faced, future plans, etc.
