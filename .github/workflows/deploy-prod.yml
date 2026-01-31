@@ -35,6 +35,9 @@ jobs:
 
       - name: Build Project
         working-directory: frontend
+        env:
+          # Backend URL so station/address autocomplete and routes work in production (see DEVOPS.md)
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://mira-backend.onrender.com' }}
         run: npm run build
 
       - name: Prepare Vercel prebuilt output
