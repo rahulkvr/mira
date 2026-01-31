@@ -1,40 +1,51 @@
 /**
- * Interests screen — MIRA Commute Companion design (OnboardingInterests).
- * Back, "What interests you?", pick at least 3, chips with emoji, Continue.
+ * Interests screen — MIRA Interest Hierarchy.
+ * Back, "What interests you?", core categories expand to show sub-interests, pick at least 3, Continue.
  */
 import { useState } from 'react'
 
 const MIN_INTERESTS = 3
 
-const INTERESTS = [
-  { id: 'baby-child', label: 'Baby & Child', emoji: '👶' },
-  { id: 'delivery-services', label: 'Delivery & Services', emoji: '📦' },
-  { id: 'gaming', label: 'Gaming', emoji: '🎮' },
-  { id: 'tech', label: 'Tech', emoji: '💻' },
-  { id: 'self-care', label: 'Self-care / Wellness', emoji: '🧘' },
-  { id: 'events', label: 'Events', emoji: '🎉' },
-  { id: 'fashion', label: 'Fashion', emoji: '👗' },
-  { id: 'food-drinks', label: 'Food & Drinks', emoji: '🍕' },
-  { id: 'jewelry', label: 'Jewelry', emoji: '💎' },
-  { id: 'bikes-mobility', label: 'Bikes & Mobility', emoji: '🚲' },
-  { id: 'fitness', label: 'Fitness', emoji: '💪' },
-  { id: 'sports', label: 'Sports', emoji: '⚽' },
-  { id: 'love-relationships', label: 'Love & Relationships', emoji: '❤️' },
-  { id: 'outdoors-nature', label: 'Outdoors & Nature', emoji: '🌲' },
-  { id: 'music', label: 'Music', emoji: '🎵' },
-  { id: 'travel', label: 'Travel', emoji: '✈️' },
-  { id: 'glasses', label: 'Glasses', emoji: '👓' },
-  { id: 'pets', label: 'Pets', emoji: '🐶' },
-  { id: 'pharmacy-health', label: 'Pharmacy / Health', emoji: '💊' },
-  { id: 'home-decoration', label: 'Home & Decoration', emoji: '🏠' },
-  { id: 'education-learning', label: 'Education & Learning', emoji: '📚' },
-  { id: 'finance-money', label: 'Finance & Money', emoji: '💰' },
-  { id: 'career-productivity', label: 'Career & Productivity', emoji: '💼' },
-  { id: 'languages', label: 'Languages', emoji: '🌍' },
-  { id: 'art-creativity', label: 'Art & Creativity', emoji: '🎨' },
-  { id: 'science', label: 'Science', emoji: '🔬' },
-  { id: 'news-trends', label: 'News & Trends', emoji: '📰' },
-  { id: 'other', label: 'Other', emoji: '✨' },
+const INTEREST_CATEGORIES = [
+  {
+    id: 'learning-growth',
+    title: 'Learning & Growth',
+    emoji: '📚',
+    interests: [
+      { id: 'languages', label: 'Languages', emoji: '🌍' },
+      { id: 'tech-coding', label: 'Tech & Coding', emoji: '💻' },
+      { id: 'career-skills', label: 'Career Skills', emoji: '💼' },
+      { id: 'academic-topics', label: 'Academic Topics', emoji: '📖' },
+      { id: 'finance-money', label: 'Finance & Money', emoji: '💰' },
+      { id: 'science-innovation', label: 'Science & Innovation', emoji: '🔬' },
+    ],
+  },
+  {
+    id: 'stories-culture',
+    title: 'Stories & Culture',
+    emoji: '🎭',
+    interests: [
+      { id: 'fiction-storytelling', label: 'Fiction & Storytelling', emoji: '📖' },
+      { id: 'news-current-events', label: 'News & Current Events', emoji: '📰' },
+      { id: 'sports', label: 'Sports', emoji: '⚽' },
+      { id: 'travel-places', label: 'Travel & Places', emoji: '✈️' },
+      { id: 'music-audio', label: 'Music & Audio', emoji: '🎵' },
+      { id: 'pop-culture', label: 'Pop Culture', emoji: '✨' },
+    ],
+  },
+  {
+    id: 'wellness-energy',
+    title: 'Wellness & Energy',
+    emoji: '🧘',
+    interests: [
+      { id: 'mindfulness-meditation', label: 'Mindfulness & Meditation', emoji: '🧘' },
+      { id: 'fitness-movement', label: 'Fitness & Movement', emoji: '💪' },
+      { id: 'nature-outdoors', label: 'Nature & Outdoors', emoji: '🌲' },
+      { id: 'relationships-connection', label: 'Relationships & Connection', emoji: '❤️' },
+      { id: 'personal-growth', label: 'Personal Growth', emoji: '🌱' },
+      { id: 'rest-recovery', label: 'Rest & Recovery', emoji: '😴' },
+    ],
+  },
 ]
 
 const GRADIENTS = [
@@ -54,6 +65,14 @@ function ChevronLeftIcon({ className }) {
   )
 }
 
+function ChevronDownIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
 function CheckIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -64,6 +83,7 @@ function CheckIcon({ className }) {
 
 export function InterestsScreen({ onComplete, onBack }) {
   const [selectedInterests, setSelectedInterests] = useState([])
+  const [expandedCategoryId, setExpandedCategoryId] = useState(null)
 
   const toggleInterest = (id) => {
     if (selectedInterests.includes(id)) {
@@ -71,6 +91,10 @@ export function InterestsScreen({ onComplete, onBack }) {
     } else {
       setSelectedInterests([...selectedInterests, id])
     }
+  }
+
+  const toggleCategory = (categoryId) => {
+    setExpandedCategoryId((prev) => (prev === categoryId ? null : categoryId))
   }
 
   const isValid = selectedInterests.length >= MIN_INTERESTS
@@ -95,7 +119,7 @@ export function InterestsScreen({ onComplete, onBack }) {
           </button>
         )}
         <h1 className="text-2xl font-bold text-[#1F1F1F] mb-2">What interests you?</h1>
-        <p className="text-sm text-gray-500">Pick at least {MIN_INTERESTS} categories to personalize your experience.</p>
+        <p className="text-sm text-gray-500">Pick at least {MIN_INTERESTS} to personalize your experience. Tap a category to expand.</p>
       </div>
 
       {/* Selection counter */}
@@ -107,33 +131,67 @@ export function InterestsScreen({ onComplete, onBack }) {
         </div>
       </div>
 
-      {/* Interest chips — scrollable */}
+      {/* Interest hierarchy — expandable categories */}
       <div className="flex-1 min-h-0 overflow-y-auto relative z-10 -mx-6 px-6">
-        <div className="flex flex-wrap gap-2 pb-6">
-          {INTERESTS.map((interest, index) => {
-            const isSelected = selectedInterests.includes(interest.id)
-            const gradient = GRADIENTS[index % GRADIENTS.length]
+        <div className="space-y-3 pb-6">
+          {INTEREST_CATEGORIES.map((category, catIndex) => {
+            const isExpanded = expandedCategoryId === category.id
+            const gradient = GRADIENTS[catIndex % GRADIENTS.length]
+            const selectedInCategory = category.interests.filter((i) => selectedInterests.includes(i.id)).length
             return (
-              <button
-                key={interest.id}
-                type="button"
-                onClick={() => toggleInterest(interest.id)}
-                className={`
-                  inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200
-                  ${isSelected
-                    ? `bg-gradient-to-br ${gradient} text-[#1F1F1F] shadow-md scale-105`
-                    : 'bg-white text-gray-600 shadow-sm border border-gray-100 hover:border-gray-200'
-                  }
-                `}
+              <div
+                key={category.id}
+                className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden"
               >
-                <span>{interest.emoji}</span>
-                <span>{interest.label}</span>
-                {isSelected && (
-                  <div className="w-5 h-5 rounded-full bg-[#1F1F1F] flex items-center justify-center ml-1 shrink-0">
-                    <CheckIcon className="w-3 h-3 text-white" />
+                <button
+                  type="button"
+                  onClick={() => toggleCategory(category.id)}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-gray-50/80 transition-colors"
+                >
+                  <span className="text-base font-semibold text-[#1F1F1F] flex items-center gap-2">
+                    <span>{category.emoji}</span>
+                    <span>{category.title}</span>
+                    {selectedInCategory > 0 && (
+                      <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {selectedInCategory} selected
+                      </span>
+                    )}
+                  </span>
+                  <ChevronDownIcon
+                    className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {isExpanded && (
+                  <div className="px-4 pb-4 pt-0 flex flex-wrap gap-2 border-t border-gray-50">
+                    {category.interests.map((interest, index) => {
+                      const isSelected = selectedInterests.includes(interest.id)
+                      const subGradient = GRADIENTS[index % GRADIENTS.length]
+                      return (
+                        <button
+                          key={interest.id}
+                          type="button"
+                          onClick={() => toggleInterest(interest.id)}
+                          className={`
+                            inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200
+                            ${isSelected
+                              ? `bg-gradient-to-br ${subGradient} text-[#1F1F1F] shadow-md`
+                              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                            }
+                          `}
+                        >
+                          <span>{interest.emoji}</span>
+                          <span>{interest.label}</span>
+                          {isSelected && (
+                            <div className="w-4 h-4 rounded-full bg-[#1F1F1F] flex items-center justify-center shrink-0">
+                              <CheckIcon className="w-2.5 h-2.5 text-white" />
+                            </div>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
-              </button>
+              </div>
             )
           })}
         </div>
