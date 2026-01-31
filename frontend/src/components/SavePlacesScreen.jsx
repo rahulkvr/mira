@@ -4,6 +4,8 @@
  */
 import { useState, useEffect } from 'react'
 import AddressModal from './AddressModal.jsx'
+import AddPlaceModal from './AddPlaceModal.jsx'
+import PlacesMap from './PlacesMap.jsx'
 
 const NOMINATIM_SEARCH = 'https://nominatim.openstreetmap.org/search'
 
@@ -12,17 +14,6 @@ function geocodeAddress(address) {
   return fetch(`${NOMINATIM_SEARCH}?${params}`, {
     headers: { Accept: 'application/json', 'User-Agent': 'MIRA/1.0 (commute app)' },
   }).then((r) => r.json())
-}
-
-function bboxFromCoords(coords) {
-  const lats = Object.values(coords).map((c) => c.lat)
-  const lons = Object.values(coords).map((c) => c.lon)
-  const minLat = Math.min(...lats)
-  const maxLat = Math.max(...lats)
-  const minLon = Math.min(...lons)
-  const maxLon = Math.max(...lons)
-  const pad = 0.015
-  return [minLon - pad, minLat - pad, maxLon + pad, maxLat + pad]
 }
 
 function HomeIcon({ className }) {
@@ -41,14 +32,10 @@ function BriefcaseIcon({ className }) {
     </svg>
   )
 }
-function DumbbellIcon({ className }) {
+function GymIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M6.5 6.5h11" />
-      <path d="m6 20 4.5-4.5" />
-      <path d="m18 4 4.5 4.5" />
-      <path d="m6 4 4.5 4.5" />
-      <path d="m18 20-4.5-4.5" />
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
     </svg>
   )
 }
@@ -90,12 +77,45 @@ function MapPinIcon({ className }) {
     </svg>
   )
 }
+function StarIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  )
+}
+function HeartIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+    </svg>
+  )
+}
 
 const PLACE_PRESETS = [
-  { id: 'home', label: 'Home', icon: 'home', IconComponent: HomeIcon, gradient: 'from-[#FFF5D6] to-[#FFE9A8]' },
-  { id: 'work', label: 'Work', icon: 'work', IconComponent: BriefcaseIcon, gradient: 'from-[#FFE4EC] to-[#FFCCD8]' },
-  { id: 'gym', label: 'Gym', icon: 'gym', IconComponent: DumbbellIcon, gradient: 'from-[#E4F0FF] to-[#C8DFFF]' },
-  { id: 'university', label: 'University', icon: 'university', IconComponent: GraduationCapIcon, gradient: 'from-[#E0F5ED] to-[#B8E8D4]' },
+  { id: 'home', label: 'Home', icon: 'home', IconComponent: HomeIcon, gradient: 'from-[#FFF5D6] to-[#FFE9A8]', markerColor: '#FFF5D6' },
+  { id: 'work', label: 'Work', icon: 'work', IconComponent: BriefcaseIcon, gradient: 'from-[#FFE4EC] to-[#FFCCD8]', markerColor: '#FFE4EC' },
+  { id: 'gym', label: 'Gym', icon: 'gym', IconComponent: GymIcon, gradient: 'from-[#E4F0FF] to-[#C8DFFF]', markerColor: '#E4F0FF' },
+  { id: 'university', label: 'University', icon: 'university', IconComponent: GraduationCapIcon, gradient: 'from-[#E0F5ED] to-[#B8E8D4]', markerColor: '#E0F5ED' },
+]
+const PLACE_COLORS = Object.fromEntries(PLACE_PRESETS.map((p) => [p.id, p.markerColor]))
+
+// Options for "Add another place" — icon and color pickers
+const CUSTOM_ICON_OPTIONS = [
+  { id: 'map-pin', IconComponent: MapPinIcon },
+  { id: 'home', IconComponent: HomeIcon },
+  { id: 'work', IconComponent: BriefcaseIcon },
+  { id: 'gym', IconComponent: GymIcon },
+  { id: 'university', IconComponent: GraduationCapIcon },
+  { id: 'star', IconComponent: StarIcon },
+  { id: 'heart', IconComponent: HeartIcon },
+]
+const CUSTOM_COLOR_OPTIONS = [
+  { hex: '#D4C8ED', gradient: 'from-[#E8E0F5] to-[#D4C8ED]' },
+  { hex: '#FFD4B8', gradient: 'from-[#FFE8D6] to-[#FFD4B8]' },
+  { hex: '#B8E8E0', gradient: 'from-[#D6F0ED] to-[#B8E8E0]' },
+  { hex: '#E8D4E0', gradient: 'from-[#F0E4EC] to-[#E8D4E0]' },
+  { hex: '#EDD8B8', gradient: 'from-[#F5E8D0] to-[#EDD8B8]' },
 ]
 
 export function SavePlacesScreen({ onContinue, onBack, city }) {
@@ -103,6 +123,8 @@ export function SavePlacesScreen({ onContinue, onBack, city }) {
   const [placeCoords, setPlaceCoords] = useState({})
   const [mapLoading, setMapLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [addPlaceModalOpen, setAddPlaceModalOpen] = useState(false)
+  const [mapPopupOpen, setMapPopupOpen] = useState(false)
   const [selectedPreset, setSelectedPreset] = useState(null)
 
   // Geocode saved addresses and fetch map data (Nominatim: ~1 req/sec)
@@ -158,18 +180,53 @@ export function SavePlacesScreen({ onContinue, onBack, city }) {
         updated[existingIndex] = { ...updated[existingIndex], address }
         setSavedPlaces(updated)
       } else {
-        setSavedPlaces([
-          ...savedPlaces,
-          { id: selectedPreset.id, label: selectedPreset.label, icon: selectedPreset.icon, address },
-        ])
+        const newPlace = {
+          id: selectedPreset.id,
+          label: selectedPreset.label,
+          icon: selectedPreset.icon,
+          address,
+        }
+        if (selectedPreset.gradient != null) newPlace.gradient = selectedPreset.gradient
+        if (selectedPreset.markerColor != null) newPlace.markerColor = selectedPreset.markerColor
+        setSavedPlaces([...savedPlaces, newPlace])
       }
     }
     setModalOpen(false)
     setSelectedPreset(null)
   }
 
+  const handleAddPlace = ({ name, iconId, colorHex, colorGradient, address }) => {
+    setSavedPlaces([
+      ...savedPlaces,
+      {
+        id: `custom-${Date.now()}`,
+        label: name,
+        icon: iconId,
+        markerColor: colorHex,
+        gradient: colorGradient,
+        address,
+      },
+    ])
+    setAddPlaceModalOpen(false)
+  }
+
+  const presetFromCustomPlace = (place) => ({
+    id: place.id,
+    label: place.label,
+    icon: place.icon,
+    IconComponent: CUSTOM_ICON_OPTIONS.find((o) => o.id === place.icon)?.IconComponent ?? MapPinIcon,
+    gradient: place.gradient ?? 'from-[#E8E3DD] to-[#D4CFC9]',
+    markerColor: place.markerColor ?? '#E8E3DD',
+  })
+
   const getPlaceAddress = (id) => savedPlaces.find((p) => p.id === id)?.address
   const isPlaceSaved = (id) => savedPlaces.some((p) => p.id === id && p.address)
+  const placeColorsForMap = {
+    ...PLACE_COLORS,
+    ...Object.fromEntries(
+      savedPlaces.filter((p) => String(p.id).startsWith('custom')).map((p) => [p.id, p.markerColor ?? '#E8E3DD']),
+    ),
+  }
 
   return (
     <div className="h-dvh min-h-dvh max-h-dvh flex flex-col px-6 pt-14 pb-10 bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] relative overflow-hidden">
@@ -233,15 +290,41 @@ export function SavePlacesScreen({ onContinue, onBack, city }) {
           )
         })}
 
+        {/* Custom places (added via "Add another place") */}
+        {savedPlaces.filter((p) => String(p.id).startsWith('custom')).map((place) => {
+          const IconComponent = CUSTOM_ICON_OPTIONS.find((o) => o.id === place.icon)?.IconComponent ?? MapPinIcon
+          const gradient = place.gradient ?? 'from-[#E8E3DD] to-[#D4CFC9]'
+          return (
+            <button
+              key={place.id}
+              type="button"
+              onClick={() => handleOpenModal(presetFromCustomPlace(place))}
+              className="w-full rounded-3xl bg-white shadow-lg border border-gray-50 p-5 flex items-center gap-4 text-left hover:shadow-xl active:scale-[0.99] transition-all"
+            >
+              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+                <IconComponent className="w-[22px] h-[22px] text-[#1F1F1F]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold text-[#1F1F1F]">{place.label}</p>
+                <p className="text-xs text-gray-500 truncate">{place.address ?? 'Tap to add address'}</p>
+              </div>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[#1F1F1F]">
+                <Edit2Icon className="w-3.5 h-3.5 text-white" />
+              </div>
+            </button>
+          )
+        })}
+
         {/* Add another place */}
         <button
           type="button"
-          className="w-full rounded-3xl bg-transparent border-2 border-gray-200 p-5 flex items-center gap-4 text-left hover:border-gray-300 transition-all"
+          onClick={() => setAddPlaceModalOpen(true)}
+          className="w-full rounded-3xl bg-white/80 border-2 border-gray-200 p-5 flex items-center gap-4 text-left hover:border-gray-300 hover:bg-white hover:shadow-md active:scale-[0.99] transition-all cursor-pointer"
         >
           <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center shrink-0">
-            <PlusIcon className="w-[22px] h-[22px] text-gray-400" />
+            <PlusIcon className="w-[22px] h-[22px] text-gray-500" />
           </div>
-          <p className="text-base text-gray-500">Add another place</p>
+          <p className="text-base font-medium text-gray-600">Add another place</p>
         </button>
       </div>
 
@@ -264,31 +347,42 @@ export function SavePlacesScreen({ onContinue, onBack, city }) {
             </div>
           </div>
           {savedPlaces.length > 0 && (
-            <div className="h-28 rounded-xl mt-2 relative overflow-hidden bg-gray-100 border border-gray-200/50">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => Object.keys(placeCoords).length > 0 && setMapPopupOpen(true)}
+              onKeyDown={(e) => e.key === 'Enter' && Object.keys(placeCoords).length > 0 && setMapPopupOpen(true)}
+              className={`h-40 rounded-xl mt-2 relative overflow-hidden bg-gray-100 border border-gray-200/50 ${Object.keys(placeCoords).length > 0 ? 'cursor-pointer hover:ring-2 hover:ring-[#1F1F1F]/20 transition-shadow' : ''}`}
+            >
               {mapLoading && Object.keys(placeCoords).length === 0 ? (
                 <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
                   Loading map…
                 </div>
               ) : Object.keys(placeCoords).length > 0 ? (
-                <iframe
-                  title="Map of saved places"
-                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${bboxFromCoords(placeCoords).join(',')}&layer=mapnik`}
-                  className="absolute inset-0 w-full h-full border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
+                <>
+                  <PlacesMap
+                    placeCoords={placeCoords}
+                    placeColors={placeColorsForMap}
+                    className="absolute inset-0 w-full h-full rounded-xl pointer-events-none"
+                  />
+                  <span className="absolute bottom-2 left-2 text-[10px] font-medium text-gray-500 bg-white/90 px-2 py-1 rounded shadow-sm">
+                    Tap to expand
+                  </span>
+                </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center gap-6 bg-gradient-to-br from-[#E4F0FF]/30 to-[#C8DFFF]/20">
                   {savedPlaces.slice(0, 4).map((place) => {
                     const preset = PLACE_PRESETS.find((p) => p.id === place.id)
-                    return preset ? (
+                    const IconComponent = preset?.IconComponent ?? CUSTOM_ICON_OPTIONS.find((o) => o.id === place.icon)?.IconComponent ?? MapPinIcon
+                    const gradient = preset?.gradient ?? place.gradient ?? 'from-[#E8E3DD] to-[#D4CFC9]'
+                    return (
                       <div key={place.id} className="flex flex-col items-center">
-                        <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${preset.gradient} flex items-center justify-center shadow-sm`}>
-                          <preset.IconComponent className="w-3 h-3 text-[#1F1F1F]" />
+                        <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm`}>
+                          <IconComponent className="w-3 h-3 text-[#1F1F1F]" />
                         </div>
                         <span className="text-[9px] font-medium text-gray-600 mt-1">{place.label}</span>
                       </div>
-                    ) : null
+                    )
                   })}
                 </div>
               )}
@@ -307,19 +401,68 @@ export function SavePlacesScreen({ onContinue, onBack, city }) {
         >
           Continue
         </button>
-        <p className="text-xs text-center text-gray-400 mt-3">You can skip and add places later</p>
+        <button
+          type="button"
+          onClick={() => onContinue(savedPlaces)}
+          className="text-xs text-center text-gray-400 mt-3 hover:text-gray-600 transition-colors w-full"
+        >
+          You can skip and add places later
+        </button>
       </div>
 
       <AddressModal
         isOpen={modalOpen}
         placeLabel={selectedPreset?.label || ''}
         cityName={city}
+        useExactAddressSearch={selectedPreset?.id === 'home' || selectedPreset?.id === 'work'}
+        placeType={selectedPreset?.id === 'gym' ? 'gym' : selectedPreset?.id === 'university' ? 'university' : null}
         onSave={handleSaveAddress}
         onClose={() => {
           setModalOpen(false)
           setSelectedPreset(null)
         }}
       />
+
+      <AddPlaceModal
+        isOpen={addPlaceModalOpen}
+        onClose={() => setAddPlaceModalOpen(false)}
+        cityName={city}
+        iconOptions={CUSTOM_ICON_OPTIONS}
+        colorOptions={CUSTOM_COLOR_OPTIONS}
+        onSave={handleAddPlace}
+      />
+
+      {/* Map popup — tap map to open larger view with zoom */}
+      {mapPopupOpen && Object.keys(placeCoords).length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setMapPopupOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setMapPopupOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Map zoomed in"
+        >
+          <div
+            className="relative w-full max-w-2xl h-[75vh] rounded-2xl overflow-hidden bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PlacesMap
+              placeCoords={placeCoords}
+              placeColors={placeColorsForMap}
+              className="absolute inset-0 w-full h-full rounded-2xl"
+              showZoomControl
+            />
+            <button
+              type="button"
+              onClick={() => setMapPopupOpen(false)}
+              className="absolute top-3 right-3 z-[1000] w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-600 hover:bg-gray-50 active:scale-95 transition-all"
+              aria-label="Close map"
+            >
+              <span className="text-xl leading-none" aria-hidden>×</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

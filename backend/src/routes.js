@@ -1,17 +1,97 @@
 /**
  * API routes for MIRA backend.
  * POST /api/routes — start + end locations → transit routes (schedules).
+ * Addresses are geocoded to coordinates; only coordinates or resolved stations are sent to Geofox.
  */
 
 import { Router } from 'express';
+import axios from 'axios';
 import { checkName, checkNameResults, getRoute, getAnnouncements } from './geofox.js';
 
 const router = Router();
+const NOMINATIM_SEARCH = 'https://nominatim.openstreetmap.org/search';
+
+/** Bounding box (left, bottom, right, top) per city to restrict address results. */
+const VIEWBOX_BY_CITY = {
+  Hamburg: '9.7,53.35,10.2,53.98',
+  Berlin: '13.09,52.34,13.76,52.67',
+  Munich: '11.36,48.06,11.72,48.25',
+  München: '11.36,48.06,11.72,48.25',
+};
+function getViewbox(city) {
+  if (!city || typeof city !== 'string') return null;
+  const key = city.trim();
+  return VIEWBOX_BY_CITY[key] || VIEWBOX_BY_CITY[key.replace(/\s+/g, '')] || null;
+}
+
+/**
+ * Geocode an address string to lat/lon via Nominatim. Returns { lat, lon } or null.
+ */
+async function geocodeAddress(query) {
+  const q = (typeof query === 'string' ? query : query?.name ?? '').trim();
+  if (!q) return null;
+  try {
+    const { data } = await axios.get(NOMINATIM_SEARCH, {
+      params: { q, format: 'json', limit: 1 },
+      headers: { Accept: 'application/json', 'User-Agent': 'MIRA/1.0 (transit app)' },
+      timeout: 5000,
+    });
+    const first = Array.isArray(data) ? data[0] : null;
+    if (first?.lat != null && first?.lon != null) {
+      return { lat: parseFloat(first.lat), lon: parseFloat(first.lon) };
+    }
+  } catch (err) {
+    console.warn('Geocode (Nominatim) error:', err.message);
+  }
+  return null;
+}
 
 /**
  * GET /api/stations?q=Jung
  * Station/address autocomplete. Returns { results: RegionalSDName[] }.
  */
+/**
+ * GET /api/addresses?q=... — Address autocomplete via Nominatim.
+ * Optional placeType=gym|university: search for gyms/universities in city (q can be empty or short).
+ * Returns { results: [{ display_name, lat, lon }] }.
+ */
+router.get('/addresses', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const city = (req.query.city || '').trim();
+    const placeType = (req.query.placeType || '').trim().toLowerCase();
+    const isPlaceTypeSearch = placeType === 'gym' || placeType === 'university';
+
+    if (!isPlaceTypeSearch && (!q || q.length < 3)) {
+      return res.json({ results: [] });
+    }
+    if (isPlaceTypeSearch && !city) {
+      return res.json({ results: [] });
+    }
+
+    const nominatimQ = isPlaceTypeSearch
+      ? q ? `${q} ${city}` : `${placeType} ${city}`
+      : q;
+    const params = { q: nominatimQ, format: 'json', limit: 5, addressdetails: 0 };
+    const viewbox = getViewbox(city);
+    if (viewbox) {
+      params.viewbox = viewbox;
+      params.bounded = isPlaceTypeSearch ? 0 : 1;
+    }
+    const { data } = await axios.get(NOMINATIM_SEARCH, {
+      params,
+      headers: { Accept: 'application/json', 'User-Agent': 'MIRA/1.0 (transit app)' },
+      timeout: 5000,
+    });
+    const list = Array.isArray(data) ? data : [];
+    const results = list.map((r) => ({ display_name: r.display_name, lat: r.lat, lon: r.lon }));
+    return res.json({ results });
+  } catch (err) {
+    console.warn('GET /api/addresses error:', err.message);
+    return res.json({ results: [] });
+  }
+});
+
 router.get('/stations', async (req, res) => {
   try {
     const q = (req.query.q || '').trim();
@@ -33,13 +113,24 @@ router.get('/stations', async (req, res) => {
 });
 
 /**
- * Resolve a location to SDName. Accepts string or { name, city? }.
+ * Resolve a location to SDName for getRoute. Never sends raw address text to Geofox.
+ * - If input is already SDName with id/name: return as-is.
+ * - Try HVV checkName (station/POI) first.
+ * - If not found, geocode address via Nominatim and return COORDINATE (x=lon, y=lat).
  */
 async function resolveLocation(input) {
   if (!input) return null;
+  if (typeof input === 'object' && input.coordinate && (input.type === 'COORDINATE' || input.type === 'ADDRESS')) return input;
   if (typeof input === 'object' && input.id && input.name) return input;
-  const resolved = await checkName(input);
-  return resolved ?? null;
+  const nameOrString = typeof input === 'string' ? input : input?.name ?? '';
+  if (!nameOrString) return null;
+  const resolved = await checkName(typeof input === 'string' ? input : { name: input.name, city: input.city });
+  if (resolved) return resolved;
+  const coords = await geocodeAddress(nameOrString);
+  if (coords) {
+    return { type: 'COORDINATE', coordinate: { x: coords.lon, y: coords.lat, type: 'EPSG_4326' } };
+  }
+  return null;
 }
 
 /**
