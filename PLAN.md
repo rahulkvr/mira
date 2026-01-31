@@ -92,28 +92,29 @@
 
 | Technology | Purpose | Why |
 |------------|---------|-----|
-| **Next.js 14** | React framework | App Router, Server Components, fast DX |
+| **Vite 5** | Build tool | Lightning fast HMR, modern ESM-first |
+| **React 18** | UI library | Component-based, hooks, ecosystem |
 | **Tailwind CSS** | Styling | Rapid prototyping, beautiful defaults |
-| **Howler.js** | Audio playback | Cross-browser, Web Audio API wrapper |
-| **Framer Motion** | Animations | Smooth journey visualizations |
-| **React Query** | Data fetching | Caching, real-time updates |
+| **Howler.js** | Audio playback | Cross-browser, Web Audio API wrapper (planned) |
+| **Framer Motion** | Animations | Smooth journey visualizations (planned) |
 
 ### Backend
 
 | Technology | Purpose | Why |
 |------------|---------|-----|
-| **Python 3.11+** | Language | Async support, great for API orchestration |
-| **FastAPI** | Web framework | Async, auto-docs, type hints |
-| **httpx** | HTTP client | Async requests to external APIs |
-| **Pydantic** | Validation | Type-safe API responses |
+| **Node.js 20+** | Runtime | Native ESM, fast async I/O |
+| **Express 4** | Web framework | Minimal, flexible, large ecosystem |
+| **Axios** | HTTP client | Promise-based, interceptors for auth |
+| **Supabase JS** | Database client | Type-safe, realtime subscriptions |
 
 ### Infrastructure
 
 | Technology | Purpose | Why |
 |------------|---------|-----|
-| **Vercel** | Frontend hosting | Free tier, instant deploys |
-| **Railway** | Backend hosting | Free tier, Python support |
-| **Supabase** | Database (optional) | User prefs, journey history |
+| **Vercel** | Frontend hosting | Free tier, instant deploys, preview URLs |
+| **Render** | Backend hosting | Free tier (750h/mo), Node.js support, easy setup |
+| **Supabase** | Database | PostgreSQL, auth, realtime, storage |
+| **GitHub Actions** | CI/CD | Automated testing and deployment pipelines |
 
 ---
 
