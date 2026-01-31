@@ -12,7 +12,6 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend to Vercel (Production)
     runs-on: ubuntu-latest
-    environment: production
     defaults:
       run:
         working-directory: frontend
@@ -30,6 +29,9 @@ jobs:
 
       - name: Pull Vercel Environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Install Dependencies
+        run: npm ci
 
       - name: Build Project
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
