@@ -1,0 +1,118 @@
+# MIRA Backend
+
+Node.js/Express backend for MIRA. Fetches transit routes from the **Geofox GTI API** (HVV) using start and end locations.
+
+---
+
+## Requests you can send
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check. |
+| POST | `/api/routes` | Get transit route options between two locations. |
+
+### POST `/api/routes`
+
+**Body (JSON):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `start` | string or `{ name, city? }` | yes | Start location (e.g. `"Jungfernstieg"` or `{ "name": "Jungfernstieg", "city": "Hamburg" }`) |
+| `end` | string or `{ name, city? }` | yes | End location (e.g. `"Hamburg Hbf"`) |
+| `time` | `{ date, time }` | no | When to travel. Default: now. `date`: `YYYY-MM-DD` or `DD.MM.YYYY`, `time`: `HH:mm` |
+| `timeIsDeparture` | boolean | no | `true` = time is departure (default), `false` = time is arrival |
+| `numberOfSchedules` | number | no | How many route options to return (default 10, max 20). |
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:3001/api/routes \
+  -H "Content-Type: application/json" \
+  -d '{"start":"Jungfernstieg","end":"Hamburg Hbf"}'
+```
+
+**Success response (200):** `{ "success": true, "returnCode": "OK", "realtimeAffected": false, "schedules": [ ... ] }`
+
+**Errors:** `400` (missing/invalid start or end), `422` (no routes found), `503` (Geofox API/credentials issue).
+
+---
+
+## What you get back (route data)
+
+Each item in `schedules` is one route option. You can use it for:
+
+- **Journey blocks** — `scheduleElements` = legs (e.g. S1 from Jungfernstieg to Hamburg Hbf). Each has `from`/`to` (stations + `depTime`/`arrTime`) and `line` (name, direction, type: S-Bahn, U-Bahn, Bus, etc.).
+- **Total duration** — `time` (minutes) and/or derive from first dep and last arr in `scheduleElements`.
+- **Stations and lines** — For MIRA: “By the time we pull into Hamburg Hbf…” or “You’re on the S1 toward Hamburg Airport.”
+- **Tickets** — `tickets[]` with price, type (e.g. Einzelticket HVV), level (e.g. Kurzstrecke).
+
+**Example schedule (one option):**
+
+```json
+{
+  "routeId": 0,
+  "start": { "name": "Jungfernstieg", "city": "Hamburg", "id": "Master:11950", "type": "STATION", "coordinate": { "x": 9.99, "y": 53.55 } },
+  "dest": { "name": "Hamburg Hbf", "city": "Hamburg", "id": "Master:10950", "type": "STATION", "coordinate": { "x": 10.00, "y": 53.55 } },
+  "time": 2,
+  "footpathTime": 0,
+  "tickets": [{ "price": 2.1, "type": "Einzelticket HVV (EUR)", "level": "Kurzstrecke", "tariff": "HVV" }],
+  "scheduleElements": [
+    {
+      "from": { "name": "Jungfernstieg", "depTime": { "date": "31.01.2026", "time": "14:11" } },
+      "to": { "name": "Hamburg Hbf", "arrTime": { "date": "31.01.2026", "time": "14:13" } },
+      "line": { "name": "S1", "direction": "Hamburg Airport (Flughafen)", "type": { "simpleType": "TRAIN", "shortInfo": "S", "longInfo": "S-Bahn" } }
+    }
+  ]
+}
+```
+
+---
+
+## Other Geofox endpoints (not yet in backend)
+
+The Geofox API (see `mira/Api.json`) also has these; they can be added as backend routes later:
+
+| Geofox endpoint | Use case |
+|-----------------|----------|
+| `departureList` | Live departures at a station (e.g. “Next S1 in 3 min”). |
+| `getStationInformation` | Station details (e.g. elevators, lines). |
+| `getAnnouncements` | Disruptions / announcements. |
+| `listStations` | All stations (e.g. for autocomplete). |
+| `listLines` | All lines. |
+| `init` | API version / data release info. |
+| `checkName` | Resolve a name to stations (used internally for `/api/routes`). |
+
+---
+
+## Setup
+
+1. **Install dependencies**
+
+   ```bash
+   cd mira/backend && npm install
+   ```
+
+2. **Credentials**
+
+   Copy `.env.example` to `.env` and set your Geofox GTI credentials (HVV/Geofox API):
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env`:
+
+   ```
+   GEOFOX_USER=your_username
+   GEOFOX_PASSWORD=your_password
+   ```
+
+   Get credentials from HVV/Geofox (GTI Thin Interface).
+
+3. **Run**
+
+   ```bash
+   npm run dev
+   ```
+
+   Server runs at `http://localhost:3001` (or `PORT` from `.env`).
