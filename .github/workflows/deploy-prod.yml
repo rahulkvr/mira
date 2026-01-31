@@ -37,6 +37,13 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Prepare Vercel prebuilt output
+        working-directory: frontend
+        run: |
+          mkdir -p .vercel/output/static
+          cp -r dist/. .vercel/output/static/
+          echo '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
+
       - name: Deploy to Vercel (Production)
         shell: bash
         run: |
