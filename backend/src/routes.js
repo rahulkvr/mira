@@ -4,9 +4,33 @@
  */
 
 import { Router } from 'express';
-import { checkName, getRoute } from './geofox.js';
+import { checkName, checkNameResults, getRoute } from './geofox.js';
 
 const router = Router();
+
+/**
+ * GET /api/stations?q=Jung
+ * Station/address autocomplete. Returns { results: RegionalSDName[] }.
+ */
+router.get('/stations', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) {
+      return res.json({ results: [] });
+    }
+    const results = await checkNameResults(q);
+    return res.json({ results });
+  } catch (err) {
+    if (err.code === 'ECONNREFUSED' || err.response?.status === 401) {
+      return res.status(503).json({
+        success: false,
+        error: 'Transit API unavailable or invalid credentials.',
+      });
+    }
+    console.error('GET /api/stations error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 /**
  * Resolve a location to SDName. Accepts string or { name, city? }.
