@@ -34,8 +34,8 @@ jobs:
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }} --cwd frontend
 
       - name: Build Project
-        shell: bash
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }} --cwd frontend
+        working-directory: frontend
+        run: npm run build
 
       - name: Deploy to Vercel (Production)
         shell: bash
