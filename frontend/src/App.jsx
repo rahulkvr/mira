@@ -265,7 +265,7 @@ export default function App() {
     setCurrentScreen('city')
   }
 
-  const handlePlacesContinue = (places) => {
+  const handlePlacesContinue = (_places) => {
     setCurrentScreen('email')
   }
 
@@ -273,7 +273,7 @@ export default function App() {
     setCurrentScreen('places')
   }
 
-  const handleEmailContinue = (email, password) => {
+  const handleEmailContinue = (_email, _password) => {
     setCurrentScreen('interests')
   }
 
@@ -285,7 +285,7 @@ export default function App() {
     setCurrentScreen('signin')
   }
 
-  const handleSignInSubmit = (email, password) => {
+  const handleSignInSubmit = (_email, _password) => {
     setCurrentScreen('main')
     if (!ALWAYS_SHOW_WELCOME) {
       try {
@@ -304,7 +304,7 @@ export default function App() {
     setCurrentScreen('email')
   }
 
-  const handleInterestsComplete = (interests) => {
+  const handleInterestsComplete = (_interests) => {
     setCurrentScreen('success')
   }
 

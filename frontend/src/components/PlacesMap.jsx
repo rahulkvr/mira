@@ -71,7 +71,7 @@ export default function PlacesMap({ placeCoords, placeColors = {}, className = '
       markersRef.current.forEach((m) => m.remove())
       markersRef.current = []
     }
-  }, [placeCoords, placeColors])
+  }, [placeCoords, placeColors, showZoomControl])
 
   // Cleanup map on unmount
   useEffect(() => {

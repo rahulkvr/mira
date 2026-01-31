@@ -24,7 +24,7 @@ function SearchIcon({ className }) {
 export default function AddPlaceModal({
   isOpen,
   onClose,
-  cityName = 'Hamburg',
+  cityName: _cityName = 'Hamburg',
   iconOptions = [],
   colorOptions = [],
   onSave,
@@ -103,6 +103,7 @@ export default function AddPlaceModal({
           <div className="pb-3">
             <label className="block text-sm font-medium text-gray-600 mb-2">Icon</label>
             <div className="flex flex-wrap gap-2">
+              {/* eslint-disable-next-line no-unused-vars -- IconComponent is used as <IconComponent /> */}
               {iconOptions.map(({ id, IconComponent }) => (
                 <button
                   key={id}

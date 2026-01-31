@@ -35,7 +35,7 @@ export function SignInScreen({ onSignIn, onBack }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [touched, setTouched] = useState(false)
-  const [passwordTouched, setPasswordTouched] = useState(false)
+  const [_passwordTouched, setPasswordTouched] = useState(false)
 
   const isValidEmail = EMAIL_REGEX.test(email.trim())
   const isValidPassword = password.length >= 1
