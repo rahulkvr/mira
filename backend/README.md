@@ -10,6 +10,7 @@ Node.js/Express backend for MIRA. Fetches transit routes from the **Geofox GTI A
 |--------|----------|-------------|
 | GET | `/health` | Health check. |
 | POST | `/api/routes` | Get transit route options between two locations. |
+| GET / POST | `/api/announcements` | Get HVV transit announcements (disruptions, messages). |
 
 ### POST `/api/routes`
 
@@ -34,6 +35,41 @@ curl -X POST http://localhost:3001/api/routes \
 **Success response (200):** `{ "success": true, "returnCode": "OK", "realtimeAffected": false, "schedules": [ ... ] }`
 
 **Errors:** `400` (missing/invalid start or end), `422` (no routes found), `503` (Geofox API/credentials issue).
+
+---
+
+### GET / POST `/api/announcements`
+
+Returns HVV transit announcements (disruptions, service messages). Default time range: now to 7 days ahead.
+
+**GET** — optional query params:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `from` | string (ISO date-time) | Start of time range. |
+| `to` | string (ISO date-time) | End of time range. |
+
+**POST** — optional body (JSON):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timeRange` | `{ begin, end }` | ISO date-time range. |
+| `names` | string[] | Filter by announcement names. |
+| `filterPlanned` | `"NO_FILTER"` \| `"ONLY_PLANNED"` \| `"ONLY_UNPLANNED"` | Filter planned vs unplanned. |
+| `full` | boolean | Return full announcement details. |
+| `showBroadcastRelevant` | boolean | Only broadcast-relevant. |
+
+**Example:**
+
+```bash
+curl http://localhost:3001/api/announcements
+```
+
+**Success response (200):** `{ "success": true, "returnCode": "OK", "announcements": [ ... ], "lastUpdate": "..." }`
+
+Each announcement can include `id`, `summary`, `description`, `locations`, `publication`, `validities`, `lastModified`, `planned`, `reason`, `links`, etc.
+
+**Errors:** `422` (API returned non-OK), `503` (Geofox unavailable).
 
 ---
 

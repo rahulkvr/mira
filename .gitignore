@@ -4,6 +4,7 @@ dist/
 .next/
 out/
 .vercel/
+.vite/
 .DS_Store
 last-error.json
 debug.log

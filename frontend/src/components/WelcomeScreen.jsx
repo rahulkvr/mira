@@ -4,11 +4,11 @@
  */
 export function WelcomeScreen({ onGetStarted }) {
   return (
-    <div className="min-h-screen bg-[#F7F3EE] flex flex-col px-6 py-12">
-      {/* Main content */}
-      <div className="flex-1 flex flex-col justify-center">
+    <div className="h-dvh min-h-dvh max-h-dvh overflow-hidden bg-[#F7F3EE] flex flex-col px-6 pt-4 pb-8 sm:pt-6 sm:pb-12">
+      {/* Main content — centered vertically in available space */}
+      <div className="flex-1 flex flex-col justify-center shrink-0 min-h-0">
         {/* Illustration */}
-        <div className="mb-12">
+        <div className="mb-4 sm:mb-6">
           <svg width="200" height="140" viewBox="0 0 200 140" className="mx-auto" aria-hidden>
             <circle cx="100" cy="70" r="35" fill="#F7D97A" opacity="0.6" />
             <circle cx="100" cy="70" r="25" fill="#F7D97A" />
@@ -27,18 +27,18 @@ export function WelcomeScreen({ onGetStarted }) {
         </div>
 
         {/* Text */}
-        <div className="text-center mb-12">
-          <h2 className="text-[32px] leading-[1.2] text-[#1A1A1A] mb-4 px-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <h2 className="text-[28px] sm:text-[32px] leading-tight text-[#1A1A1A] mb-2 sm:mb-3 px-2 sm:px-4">
             Make Idle Rides Amazing
           </h2>
-          <p className="text-base text-[#6B6B6B] px-4">
+          <p className="text-sm sm:text-base text-[#6B6B6B] px-2 sm:px-4">
             Personalized learning during your commute.
           </p>
         </div>
       </div>
 
-      {/* CTA */}
-      <div>
+      {/* CTA — anchored at bottom */}
+      <div className="shrink-0 pt-4 sm:pt-6">
         <button
           type="button"
           onClick={onGetStarted}

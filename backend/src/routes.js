@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { checkName, checkNameResults, getRoute } from './geofox.js';
+import { checkName, checkNameResults, getRoute, getAnnouncements } from './geofox.js';
 
 const router = Router();
 
@@ -107,5 +107,77 @@ router.post('/routes', async (req, res) => {
     });
   }
 });
+
+/**
+ * GET /api/announcements
+ * Query: from (ISO date-time, optional), to (ISO date-time, optional)
+ * Returns transit announcements (disruptions, messages) for HVV.
+ *
+ * POST /api/announcements
+ * Body: { timeRange?: { begin, end }, names?: string[], filterPlanned?: 'NO_FILTER'|'ONLY_PLANNED'|'ONLY_UNPLANNED', full?: boolean }
+ * Same response.
+ */
+async function handleAnnouncements(req, res) {
+  try {
+    let options = {};
+    if (req.method === 'POST' && req.body && Object.keys(req.body).length > 0) {
+      options = {
+        timeRange: req.body.timeRange,
+        names: req.body.names,
+        filterPlanned: req.body.filterPlanned,
+        full: req.body.full,
+        showBroadcastRelevant: req.body.showBroadcastRelevant,
+      };
+    } else {
+      const from = req.query.from?.trim();
+      const to = req.query.to?.trim();
+      if (from || to) {
+        const now = new Date();
+        options.timeRange = {
+          begin: from || now.toISOString(),
+          end: to || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        };
+      }
+    }
+    const data = await getAnnouncements(options);
+    if (data.returnCode !== 'OK') {
+      return res.status(422).json({
+        success: false,
+        returnCode: data.returnCode,
+        errorText: data.errorText || data.errorDevInfo || 'Announcements request failed',
+      });
+    }
+    return res.json({
+      success: true,
+      returnCode: data.returnCode,
+      announcements: data.announcements ?? [],
+      lastUpdate: data.lastUpdate ?? null,
+    });
+  } catch (err) {
+    if (err.code === 'ECONNREFUSED' || err.response?.status === 401) {
+      return res.status(503).json({
+        success: false,
+        error: 'Transit API unavailable or invalid credentials.',
+      });
+    }
+    if (err.response?.status === 400) {
+      const detail = err.response?.data;
+      console.error('GET/POST /api/announcements Geofox 400:', detail);
+      return res.status(400).json({
+        success: false,
+        error: 'Transit API rejected request (Bad Request).',
+        detail: detail ?? err.message,
+      });
+    }
+    console.error('GET/POST /api/announcements error:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Internal server error',
+    });
+  }
+}
+
+router.get('/announcements', handleAnnouncements);
+router.post('/announcements', handleAnnouncements);
 
 export default router;
