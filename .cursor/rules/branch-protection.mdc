@@ -1,0 +1,41 @@
+---
+description: Enforce branch protection - no edits or commits directly to main branch
+alwaysApply: true
+---
+
+# Branch Protection Rule
+
+**CRITICAL**: Never make edits or commits directly to the `main` branch.
+
+## Workflow
+
+1. **Always check current branch** before making any code changes
+2. **Create a feature branch** if currently on `main`:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. **Make changes and commit** on the feature branch
+4. **Push and create a pull request** for review before merging to main
+
+## Example Branch Names
+
+- `feature/add-authentication`
+- `fix/resolve-api-timeout`
+- `refactor/improve-error-handling`
+- `docs/update-readme`
+
+## What to Do If on Main
+
+If you detect that the current branch is `main`:
+
+1. **STOP** - Do not proceed with edits
+2. **Alert the user** that they are on the main branch
+3. **Suggest creating a new branch** with an appropriate name based on the task
+4. **Wait for confirmation** before making any changes
+
+## Why This Matters
+
+- Protects production code from direct modifications
+- Ensures all changes go through code review
+- Maintains a clean git history
+- Prevents accidental breaking changes
