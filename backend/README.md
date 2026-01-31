@@ -50,9 +50,12 @@ Address autocomplete for exact addresses (e.g. Home/Work). Uses Nominatim (OpenS
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `q` | string | Search query (min 3 chars). |
+| `q` | string | Search query (min 3 chars for exact-address search; optional when `placeType` is set). |
+| `city` | string | Restrict results to city (e.g. `Hamburg`, `Berlin`, `Munich`). Required when using `placeType`. |
+| `placeType` | string | `gym` or `university` — search for gyms/universities in the city. When set, `q` can be empty (returns gyms/universities in city) or used to filter (e.g. `q=McFit` + `placeType=gym`). |
 
-**Example:** `GET /api/addresses?q=Mönckebergstraße%207`
+**Example:** `GET /api/addresses?q=Mönckebergstraße%207&city=Hamburg`  
+**Example (gyms in city):** `GET /api/addresses?city=Hamburg&placeType=gym`
 
 **Success response (200):** `{ "results": [ { "display_name": "...", "lat": "...", "lon": "..." }, ... ] }`
 

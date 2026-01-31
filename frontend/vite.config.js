@@ -7,7 +7,10 @@ export default defineConfig({
   server: {
     host: true, // listen on 0.0.0.0 so you can access via LAN IP (e.g. http://10.172.2.231:5173)
     proxy: {
-      '/api': 'http://localhost:3001',
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
     },
   },
 })

@@ -111,11 +111,11 @@ const CUSTOM_ICON_OPTIONS = [
   { id: 'heart', IconComponent: HeartIcon },
 ]
 const CUSTOM_COLOR_OPTIONS = [
-  { hex: '#FFF5D6', gradient: 'from-[#FFF5D6] to-[#FFE9A8]' },
-  { hex: '#FFE4EC', gradient: 'from-[#FFE4EC] to-[#FFCCD8]' },
-  { hex: '#E4F0FF', gradient: 'from-[#E4F0FF] to-[#C8DFFF]' },
-  { hex: '#E0F5ED', gradient: 'from-[#E0F5ED] to-[#B8E8D4]' },
-  { hex: '#E8E3DD', gradient: 'from-[#E8E3DD] to-[#D4CFC9]' },
+  { hex: '#D4C8ED', gradient: 'from-[#E8E0F5] to-[#D4C8ED]' },
+  { hex: '#FFD4B8', gradient: 'from-[#FFE8D6] to-[#FFD4B8]' },
+  { hex: '#B8E8E0', gradient: 'from-[#D6F0ED] to-[#B8E8E0]' },
+  { hex: '#E8D4E0', gradient: 'from-[#F0E4EC] to-[#E8D4E0]' },
+  { hex: '#EDD8B8', gradient: 'from-[#F5E8D0] to-[#EDD8B8]' },
 ]
 
 export function SavePlacesScreen({ onContinue, onBack, city }) {
@@ -373,14 +373,16 @@ export function SavePlacesScreen({ onContinue, onBack, city }) {
                 <div className="absolute inset-0 flex items-center justify-center gap-6 bg-gradient-to-br from-[#E4F0FF]/30 to-[#C8DFFF]/20">
                   {savedPlaces.slice(0, 4).map((place) => {
                     const preset = PLACE_PRESETS.find((p) => p.id === place.id)
-                    return preset ? (
+                    const IconComponent = preset?.IconComponent ?? CUSTOM_ICON_OPTIONS.find((o) => o.id === place.icon)?.IconComponent ?? MapPinIcon
+                    const gradient = preset?.gradient ?? place.gradient ?? 'from-[#E8E3DD] to-[#D4CFC9]'
+                    return (
                       <div key={place.id} className="flex flex-col items-center">
-                        <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${preset.gradient} flex items-center justify-center shadow-sm`}>
-                          <preset.IconComponent className="w-3 h-3 text-[#1F1F1F]" />
+                        <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm`}>
+                          <IconComponent className="w-3 h-3 text-[#1F1F1F]" />
                         </div>
                         <span className="text-[9px] font-medium text-gray-600 mt-1">{place.label}</span>
                       </div>
-                    ) : null
+                    )
                   })}
                 </div>
               )}
@@ -399,7 +401,13 @@ export function SavePlacesScreen({ onContinue, onBack, city }) {
         >
           Continue
         </button>
-        <p className="text-xs text-center text-gray-400 mt-3">You can skip and add places later</p>
+        <button
+          type="button"
+          onClick={() => onContinue(savedPlaces)}
+          className="text-xs text-center text-gray-400 mt-3 hover:text-gray-600 transition-colors w-full"
+        >
+          You can skip and add places later
+        </button>
       </div>
 
       <AddressModal
@@ -407,6 +415,7 @@ export function SavePlacesScreen({ onContinue, onBack, city }) {
         placeLabel={selectedPreset?.label || ''}
         cityName={city}
         useExactAddressSearch={selectedPreset?.id === 'home' || selectedPreset?.id === 'work'}
+        placeType={selectedPreset?.id === 'gym' ? 'gym' : selectedPreset?.id === 'university' ? 'university' : null}
         onSave={handleSaveAddress}
         onClose={() => {
           setModalOpen(false)

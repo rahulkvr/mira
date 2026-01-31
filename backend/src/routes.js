@@ -11,6 +11,19 @@ import { checkName, checkNameResults, getRoute, getAnnouncements } from './geofo
 const router = Router();
 const NOMINATIM_SEARCH = 'https://nominatim.openstreetmap.org/search';
 
+/** Bounding box (left, bottom, right, top) per city to restrict address results. */
+const VIEWBOX_BY_CITY = {
+  Hamburg: '9.7,53.35,10.2,53.98',
+  Berlin: '13.09,52.34,13.76,52.67',
+  Munich: '11.36,48.06,11.72,48.25',
+  München: '11.36,48.06,11.72,48.25',
+};
+function getViewbox(city) {
+  if (!city || typeof city !== 'string') return null;
+  const key = city.trim();
+  return VIEWBOX_BY_CITY[key] || VIEWBOX_BY_CITY[key.replace(/\s+/g, '')] || null;
+}
+
 /**
  * Geocode an address string to lat/lon via Nominatim. Returns { lat, lon } or null.
  */
@@ -38,17 +51,35 @@ async function geocodeAddress(query) {
  * Station/address autocomplete. Returns { results: RegionalSDName[] }.
  */
 /**
- * GET /api/addresses?q=... — Address autocomplete via Nominatim (exact addresses, e.g. Home/Work).
+ * GET /api/addresses?q=... — Address autocomplete via Nominatim.
+ * Optional placeType=gym|university: search for gyms/universities in city (q can be empty or short).
  * Returns { results: [{ display_name, lat, lon }] }.
  */
 router.get('/addresses', async (req, res) => {
   try {
     const q = (req.query.q || '').trim();
-    if (!q || q.length < 3) {
+    const city = (req.query.city || '').trim();
+    const placeType = (req.query.placeType || '').trim().toLowerCase();
+    const isPlaceTypeSearch = placeType === 'gym' || placeType === 'university';
+
+    if (!isPlaceTypeSearch && (!q || q.length < 3)) {
       return res.json({ results: [] });
     }
+    if (isPlaceTypeSearch && !city) {
+      return res.json({ results: [] });
+    }
+
+    const nominatimQ = isPlaceTypeSearch
+      ? q ? `${q} ${city}` : `${placeType} ${city}`
+      : q;
+    const params = { q: nominatimQ, format: 'json', limit: 5, addressdetails: 0 };
+    const viewbox = getViewbox(city);
+    if (viewbox) {
+      params.viewbox = viewbox;
+      params.bounded = isPlaceTypeSearch ? 0 : 1;
+    }
     const { data } = await axios.get(NOMINATIM_SEARCH, {
-      params: { q, format: 'json', limit: 5, addressdetails: 0 },
+      params,
       headers: { Accept: 'application/json', 'User-Agent': 'MIRA/1.0 (transit app)' },
       timeout: 5000,
     });

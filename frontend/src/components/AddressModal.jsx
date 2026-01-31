@@ -1,6 +1,7 @@
 /**
  * Modal to add/edit address for a place.
- * When useExactAddressSearch (Home/Work): real address autocomplete via backend Nominatim.
+ * useExactAddressSearch (Home/Work): exact address autocomplete via Nominatim.
+ * placeType gym|university: gym/university POIs in city via Nominatim.
  * Otherwise: mock suggestions by city.
  */
 import { useState, useEffect } from 'react'
@@ -66,11 +67,14 @@ function CheckIcon({ className }) {
   )
 }
 
-export default function AddressModal({ isOpen, placeLabel, cityName = 'Hamburg', useExactAddressSearch = false, onSave, onClose }) {
+export default function AddressModal({ isOpen, placeLabel, cityName = 'Hamburg', useExactAddressSearch = false, placeType = null, onSave, onClose }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedAddress, setSelectedAddress] = useState(null)
   const [addressSuggestions, setAddressSuggestions] = useState([])
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+
+  const usePlaceTypeSearch = placeType === 'gym' || placeType === 'university'
+  const useApiSearch = useExactAddressSearch || usePlaceTypeSearch
 
   const mockAddresses = MOCK_ADDRESSES[cityName] || MOCK_ADDRESSES.Hamburg
   const mockFiltered = searchQuery.trim()
@@ -78,6 +82,28 @@ export default function AddressModal({ isOpen, placeLabel, cityName = 'Hamburg',
     : mockAddresses.slice(0, 5)
 
   useEffect(() => {
+    if (usePlaceTypeSearch && cityName?.trim()) {
+      const t = setTimeout(async () => {
+        setSuggestionsLoading(true)
+        try {
+          const params = new URLSearchParams({ city: cityName.trim(), placeType })
+          if (searchQuery.trim()) params.set('q', searchQuery.trim())
+          const res = await fetch(`${API_BASE}/api/addresses?${params}`)
+          const contentType = res.headers.get('content-type') || ''
+          if (!res.ok || !contentType.includes('application/json')) {
+            setAddressSuggestions([])
+            return
+          }
+          const data = await res.json()
+          setAddressSuggestions(data.results || [])
+        } catch {
+          setAddressSuggestions([])
+        } finally {
+          setSuggestionsLoading(false)
+        }
+      }, 300)
+      return () => clearTimeout(t)
+    }
     if (!useExactAddressSearch || !searchQuery.trim() || searchQuery.length < 3) {
       setAddressSuggestions([])
       return
@@ -85,7 +111,14 @@ export default function AddressModal({ isOpen, placeLabel, cityName = 'Hamburg',
     const t = setTimeout(async () => {
       setSuggestionsLoading(true)
       try {
-        const res = await fetch(`${API_BASE}/api/addresses?q=${encodeURIComponent(searchQuery.trim())}`)
+        const params = new URLSearchParams({ q: searchQuery.trim() })
+        if (cityName?.trim()) params.set('city', cityName.trim())
+        const res = await fetch(`${API_BASE}/api/addresses?${params}`)
+        const contentType = res.headers.get('content-type') || ''
+        if (!res.ok || !contentType.includes('application/json')) {
+          setAddressSuggestions([])
+          return
+        }
         const data = await res.json()
         setAddressSuggestions(data.results || [])
       } catch {
@@ -95,10 +128,10 @@ export default function AddressModal({ isOpen, placeLabel, cityName = 'Hamburg',
       }
     }, 300)
     return () => clearTimeout(t)
-  }, [useExactAddressSearch, searchQuery])
+  }, [useExactAddressSearch, usePlaceTypeSearch, placeType, searchQuery, cityName])
 
-  const suggestions = useExactAddressSearch ? addressSuggestions : mockFiltered
-  const displayList = useExactAddressSearch ? suggestions.map((r) => r.display_name) : suggestions
+  const suggestions = useApiSearch ? addressSuggestions : mockFiltered
+  const displayList = useApiSearch ? suggestions.map((r) => r.display_name) : suggestions
 
   const handleSave = () => {
     const toSave = selectedAddress || searchQuery.trim()
@@ -153,7 +186,7 @@ export default function AddressModal({ isOpen, placeLabel, cityName = 'Hamburg',
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={useExactAddressSearch ? 'Street, number, city' : 'Enter address or stop'}
+              placeholder={useExactAddressSearch ? 'Street, number, city' : usePlaceTypeSearch ? `Search ${placeType} in ${cityName || 'city'}` : 'Enter address or stop'}
               className="w-full h-14 pl-12 pr-4 rounded-2xl border border-gray-200 bg-white text-[15px] font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFD56B] focus:border-transparent shadow-sm"
             />
           </div>
@@ -169,7 +202,7 @@ export default function AddressModal({ isOpen, placeLabel, cityName = 'Hamburg',
         {/* Address suggestions */}
         <div className="flex-1 overflow-y-auto px-5 pb-5 min-h-0">
           <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
-            {useExactAddressSearch ? 'Exact address' : 'Suggestions'}
+            {useExactAddressSearch ? 'Exact address' : usePlaceTypeSearch ? `${placeType} in ${cityName || 'city'}` : 'Suggestions'}
           </p>
           {useExactAddressSearch && suggestionsLoading && (
             <p className="text-sm text-gray-500 py-2">Searching…</p>

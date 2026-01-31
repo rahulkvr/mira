@@ -1,11 +1,11 @@
 /**
  * Welcome screen — MIRA Commute Companion design.
- * First screen in onboarding: logo, train illustration, headline, Get started / Skip.
+ * First screen: logo, train illustration, headline, Get started (primary), Sign in (returning users).
  */
 import trainSunrise from '../assets/train-sunrise.png'
 import miraLogo from '../assets/mira-logo.png'
 
-export function WelcomeScreen({ onGetStarted, onSkip }) {
+export function WelcomeScreen({ onGetStarted, onSignIn }) {
   return (
     <div className="h-dvh min-h-dvh max-h-dvh overflow-hidden flex flex-col px-6 pt-12 pb-10 bg-[#F7F3EE]">
       {/* Top Logo */}
@@ -41,13 +41,13 @@ export function WelcomeScreen({ onGetStarted, onSkip }) {
         >
           Get started
         </button>
-        {onSkip && (
+        {onSignIn && (
           <button
             type="button"
-            onClick={onSkip}
-            className="w-full py-3 text-center text-[#8B8B8B] text-base font-medium"
+            onClick={onSignIn}
+            className="w-full h-14 px-8 py-4 rounded-full bg-white border-2 border-[#1F1F1F] text-[#1F1F1F] font-semibold text-base shadow-sm hover:bg-gray-50 transition-all duration-200 active:scale-[0.98]"
           >
-            Skip
+            Sign in
           </button>
         )}
       </div>
