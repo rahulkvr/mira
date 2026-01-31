@@ -1,0 +1,55 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches: [develop]
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy-frontend:
+    name: Deploy Frontend to Vercel (Preview)
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }} --cwd frontend
+
+      - name: Build Project  
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }} --cwd frontend
+
+      - name: Deploy to Vercel (Preview)
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} --cwd frontend)
+          echo "url=$url" >> $GITHUB_OUTPUT
+          echo "### Frontend Preview URL" >> $GITHUB_STEP_SUMMARY
+          echo "$url" >> $GITHUB_STEP_SUMMARY
+
+  deploy-backend:
+    name: Deploy Backend to Render (Dev)
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Trigger Render Deploy
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_DEV }}"
+          echo "### Backend Deploy Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "Render deployment initiated for dev environment" >> $GITHUB_STEP_SUMMARY
