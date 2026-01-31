@@ -45,6 +45,9 @@ function createClient() {
  * @param {string|{name: string, city?: string}} input - Station/address name or SDName-like object
  * @returns {Promise<object|null>} First matching result (RegionalSDName) or null
  */
+/** Max results for autocomplete dropdown */
+const CHECK_NAME_MAX_LIST = 10;
+
 export async function checkName(input) {
   const theName =
     typeof input === 'string'
@@ -65,6 +68,27 @@ export async function checkName(input) {
 }
 
 /**
+ * Station/address search for autocomplete. Returns all matches (not just first).
+ * @param {string} query - Search text
+ * @param {number} maxList - Max results (default 10)
+ * @returns {Promise<object[]>} results (RegionalSDName[])
+ */
+export async function checkNameResults(query, maxList = CHECK_NAME_MAX_LIST) {
+  const q = (query || '').trim();
+  if (!q) return [];
+  const client = createClient();
+  const { data } = await client.post('/gti/public/checkName', {
+    language: 'de',
+    version: 1,
+    filterType: 'HVV_LISTED',
+    theName: { name: q },
+    maxList: Math.min(Math.max(1, maxList), 20),
+  });
+  if (data.returnCode !== 'OK' || !data.results?.length) return [];
+  return data.results;
+}
+
+/**
  * Get route options between start and destination.
  * @param {object} start - SDName (e.g. from checkName or { name, id, coordinate })
  * @param {object} dest - SDName
@@ -77,7 +101,11 @@ export async function getRoute(start, dest, options = {}) {
   const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
   const { time: reqTime = { date, time }, timeIsDeparture = true, numberOfSchedules: rawNum = 10 } = options;
-  const numberOfSchedules = Math.min(Math.max(1, Number(rawNum) || 10), 20);
+  const num = Math.min(Math.max(1, Number(rawNum) || 10), 20);
+  const numberOfSchedules = num;
+  // Only next departures from search time (no past journeys)
+  const schedulesBefore = 0;
+  const schedulesAfter = Math.max(0, num - 1);
 
   const client = createClient();
   const { data } = await client.post('/gti/public/getRoute', {
@@ -89,6 +117,8 @@ export async function getRoute(start, dest, options = {}) {
     time: reqTime,
     timeIsDeparture,
     numberOfSchedules,
+    schedulesBefore,
+    schedulesAfter,
     realtime: 'AUTO',
   });
   return data;
