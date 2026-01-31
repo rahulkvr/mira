@@ -4,6 +4,7 @@
   "private": true,
   "description": "Commute Compose - AI Music for Your Journey",
   "scripts": {
+    "postinstall": "npm run install:all",
     "dev": "concurrently -n frontend,backend -c cyan,yellow \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",

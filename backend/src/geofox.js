@@ -136,3 +136,33 @@ function normalizeSDName(obj) {
   if (obj.coordinate != null) out.coordinate = { ...obj.coordinate, type: obj.coordinate.type || 'EPSG_4326' };
   return out;
 }
+
+/**
+ * Get transit announcements (disruptions, messages).
+ * Geofox expects minimal request; timeRange optional and format must match API.
+ * @param {object} options - { timeRange?: { begin, end } (ISO date-time), names?: string[], filterPlanned?: 'NO_FILTER'|'ONLY_PLANNED'|'ONLY_UNPLANNED', full?: boolean }
+ * @returns {Promise<object>} AnnouncementResponse: { returnCode, announcements, lastUpdate, errorText? }
+ */
+export async function getAnnouncements(options = {}) {
+  const body = {
+    language: 'de',
+    version: 1,
+    filterType: options.filterType ?? 'NO_FILTER',
+    full: options.full ?? false,
+    filterPlanned: options.filterPlanned ?? 'NO_FILTER',
+    showBroadcastRelevant: options.showBroadcastRelevant ?? false,
+  };
+  if (options.names?.length) body.names = options.names;
+
+  // Only send timeRange if provided; Geofox may 400 on invalid or unexpected format
+  if (options.timeRange?.begin != null && options.timeRange?.end != null) {
+    body.timeRange = {
+      begin: options.timeRange.begin,
+      end: options.timeRange.end,
+    };
+  }
+
+  const client = createClient();
+  const { data } = await client.post('/gti/public/getAnnouncements', body);
+  return data;
+}
