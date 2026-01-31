@@ -12,7 +12,6 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend to Vercel (Production)
     runs-on: ubuntu-latest
-    environment: production
     defaults:
       run:
         working-directory: frontend
