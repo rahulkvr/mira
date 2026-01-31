@@ -1,0 +1,23 @@
+# Render Blueprint - Backend Service Configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: mira-backend
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GEOFOX_USER
+        sync: false
+      - key: GEOFOX_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false

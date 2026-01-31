@@ -1,0 +1,36 @@
+{
+  "name": "mira",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Commute Compose - AI Music for Your Journey",
+  "scripts": {
+    "dev": "concurrently -n frontend,backend -c cyan,yellow \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend": "echo 'No build step for backend'",
+    "start": "npm run start --prefix backend",
+    "install:all": "npm install --prefix frontend && npm install --prefix backend",
+    "lint": "npm run lint --prefix frontend",
+    "clean": "rimraf frontend/dist frontend/node_modules backend/node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "rimraf": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/mira.git"
+  },
+  "keywords": [
+    "transit",
+    "music",
+    "ai",
+    "hackathon"
+  ],
+  "license": "MIT"
+}
