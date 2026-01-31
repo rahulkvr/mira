@@ -31,7 +31,7 @@ function LockIcon({ className }) {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function SignInScreen({ onSignIn, onBack }) {
+export function SignInScreen({ onSignIn, onBack, errorMessage }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [touched, setTouched] = useState(false)
@@ -106,6 +106,12 @@ export function SignInScreen({ onSignIn, onBack }) {
           />
         </div>
       </div>
+
+      {errorMessage && (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 relative z-10">
+          {errorMessage}
+        </div>
+      )}
 
       <div className="pt-6 shrink-0 relative z-10 mt-auto">
         <button
