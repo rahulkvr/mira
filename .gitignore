@@ -8,4 +8,3 @@ out/
 last-error.json
 debug.log
 /backend/.env
-frontend/package-lock.json
