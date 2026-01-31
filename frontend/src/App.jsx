@@ -13,15 +13,18 @@ function selectedLabel(selected) {
   return selected ? (selected.combinedName || (selected.city ? `${selected.name}, ${selected.city}` : selected.name)) : ''
 }
 
-function StationInput({ id, label, placeholder, value, selected, onChange, onSelect, disabled, dark, variant }) {
+function StationInput({ id, placeholder, value, selected, onChange, onSelect, disabled, dark, variant }) {
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const debounceRef = useRef(null)
   const wrapperRef = useRef(null)
   const selectedRef = useRef(selected)
-  selectedRef.current = selected
   const displayValue = value ?? selectedLabel(selected)
+  
+  useEffect(() => {
+    selectedRef.current = selected
+  }, [selected])
 
   useEffect(() => {
     if (!displayValue.trim()) {
@@ -152,7 +155,7 @@ function getLineStyle(line) {
   return { ...FALLBACK_COLOR, label }
 }
 
-function RouteOption({ schedule, index }) {
+function RouteOption({ schedule }) {
   const elements = schedule.scheduleElements || []
 
   return (
@@ -205,7 +208,7 @@ export default function App() {
     ALWAYS_SHOW_WELCOME ? 'welcome' : (localStorage.getItem(WELCOME_DONE_KEY) ? 'main' : 'welcome')
   )
   // currentScreen: 'welcome' | 'city' | 'places' | 'main'
-  const [selectedCity, setSelectedCity] = useState('')
+  const [_selectedCity, setSelectedCity] = useState('')
   const [startQuery, setStartQuery] = useState('')
   const [endQuery, setEndQuery] = useState('')
   const [startSelected, setStartSelected] = useState(null)
@@ -228,11 +231,15 @@ export default function App() {
 
   const handlePlacesContinue = () => {
     setCurrentScreen('main')
-    if (!ALWAYS_SHOW_WELCOME) try { localStorage.setItem(WELCOME_DONE_KEY, '1') } catch (_) {}
+    if (!ALWAYS_SHOW_WELCOME) {
+      try {
+        localStorage.setItem(WELCOME_DONE_KEY, '1')
+      } catch {
+        // Ignore localStorage errors
+      }
+    }
   }
 
-  const startValue = startSelected || startQuery
-  const endValue = endSelected || endQuery
   const hasStart = (startSelected && startSelected.id) || startQuery.trim()
   const hasEnd = (endSelected && endSelected.id) || endQuery.trim()
 
@@ -304,7 +311,6 @@ export default function App() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <StationInput
             id="start"
-            label="From"
             placeholder="Starting point"
             value={startQuery}
             selected={startSelected}
@@ -332,7 +338,6 @@ export default function App() {
           </div>
           <StationInput
             id="end"
-            label="To"
             placeholder="Drop me here"
             value={endQuery}
             selected={endSelected}
