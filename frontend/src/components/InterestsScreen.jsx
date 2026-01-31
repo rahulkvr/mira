@@ -134,9 +134,8 @@ export function InterestsScreen({ onComplete, onBack }) {
       {/* Interest hierarchy — expandable categories */}
       <div className="flex-1 min-h-0 overflow-y-auto relative z-10 -mx-6 px-6">
         <div className="space-y-3 pb-6">
-          {INTEREST_CATEGORIES.map((category, catIndex) => {
+          {INTEREST_CATEGORIES.map((category) => {
             const isExpanded = expandedCategoryId === category.id
-            const gradient = GRADIENTS[catIndex % GRADIENTS.length]
             const selectedInCategory = category.interests.filter((i) => selectedInterests.includes(i.id)).length
             return (
               <div
