@@ -139,7 +139,7 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
   const remaining = MIN_INTERESTS - selectedInterests.length
 
   return (
-    <div className="h-dvh min-h-dvh max-h-dvh overflow-hidden flex flex-col px-6 pt-14 pb-10 bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] relative">
+    <div className="h-dvh min-h-dvh max-h-dvh min-h-0 overflow-hidden flex flex-col px-6 pt-14 pb-safe-bottom bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] relative">
       {/* Decorative blobs */}
       <div className="absolute top-20 -right-16 w-48 h-48 rounded-full bg-gradient-to-br from-[#F0E8FF]/30 to-[#DDD0FF]/20 blur-3xl pointer-events-none" aria-hidden />
       <div className="absolute bottom-40 -left-20 w-56 h-56 rounded-full bg-gradient-to-br from-[#E0F5ED]/25 to-[#B8E8D4]/15 blur-3xl pointer-events-none" aria-hidden />
