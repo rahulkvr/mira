@@ -6,17 +6,49 @@ import { SavePlacesScreen } from './components/SavePlacesScreen.jsx'
 import { EmailScreen } from './components/EmailScreen.jsx'
 import { InterestsScreen } from './components/InterestsScreen.jsx'
 import { SuccessScreen } from './components/SuccessScreen.jsx'
+import { PodcastScreen } from './components/PodcastScreen.jsx'
 import { AppHeader } from './components/AppHeader.jsx'
 import { BottomNavigation } from './components/BottomNavigation.jsx'
 import { ExploreTab } from './components/ExploreTab.jsx'
 import { ProfileTab } from './components/ProfileTab.jsx'
 import { useAuth } from './contexts/AuthContext.jsx'
+import { hasSupabaseConfig, supabase } from './lib/supabase.js'
+import { savePodcastAudio } from './lib/podcastCache.js'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 // Set to true to always show welcome on load (for editing). Set to false and use key below to show once.
 const ALWAYS_SHOW_WELCOME = true
 const WELCOME_DONE_KEY = 'mira_welcome_done'
 const STATIONS_DEBOUNCE_MS = 300
+const DEFAULT_PODCAST_MIN = 6
+
+function formatInterestLabel(value) {
+  return String(value || '').replace(/[-_]/g, ' ').trim()
+}
+
+function suggestedTopic(interests, durationMinutes) {
+  const safeDuration = Math.max(1, Math.round(durationMinutes || DEFAULT_PODCAST_MIN))
+  const cleaned = (interests || []).map(formatInterestLabel).filter(Boolean)
+  const focus = cleaned.slice(0, 2)
+  if (focus.length > 0) {
+    return `${safeDuration}-minute calm episode on ${focus.join(' and ')}`
+  }
+  return `${safeDuration}-minute calm commute companion`
+}
+
+function base64ToBlob(base64, contentType) {
+  const byteCharacters = atob(base64 || '')
+  const byteArrays = []
+  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+    const slice = byteCharacters.slice(offset, offset + 512)
+    const byteNumbers = new Array(slice.length)
+    for (let i = 0; i < slice.length; i += 1) {
+      byteNumbers[i] = slice.charCodeAt(i)
+    }
+    byteArrays.push(new Uint8Array(byteNumbers))
+  }
+  return new Blob(byteArrays, { type: contentType })
+}
 
 function selectedLabel(selected) {
   return selected ? (selected.combinedName || (selected.city ? `${selected.name}, ${selected.city}` : selected.name)) : ''
@@ -164,7 +196,7 @@ function getLineStyle(line) {
   return { ...FALLBACK_COLOR, label }
 }
 
-function RouteOption({ schedule }) {
+function RouteOption({ schedule, onSelect }) {
   const elements = schedule.scheduleElements || []
   const totalMin = schedule.time
   const walkMin = schedule.footpathTime || 0
@@ -218,6 +250,15 @@ function RouteOption({ schedule }) {
           </span>
         </div>
       )}
+      {onSelect && (
+        <button
+          type="button"
+          onClick={() => onSelect(schedule)}
+          className="mt-4 w-full h-11 rounded-2xl text-sm font-semibold bg-[#1F1F1F] text-white shadow hover:bg-[#2A2A2A] transition-colors"
+        >
+          Create podcast
+        </button>
+      )}
     </article>
   )
 }
@@ -236,7 +277,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState(() =>
     ALWAYS_SHOW_WELCOME ? 'welcome' : (localStorage.getItem(WELCOME_DONE_KEY) ? 'main' : 'welcome')
   )
-  // currentScreen: 'welcome' | 'city' | 'places' | 'email' | 'interests' | 'success' | 'main'
+  // currentScreen: 'welcome' | 'city' | 'places' | 'email' | 'interests' | 'success' | 'podcast' | 'main'
   const [_selectedCity, setSelectedCity] = useState('')
   const [startQuery, setStartQuery] = useState('')
   const [endQuery, setEndQuery] = useState('')
@@ -249,19 +290,77 @@ export default function App() {
   const [error, setError] = useState(null)
   const [signInError, setSignInError] = useState(null)
   const [signUpError, setSignUpError] = useState(null)
+  const [interestsError, setInterestsError] = useState('')
+  const [interestsSaving, setInterestsSaving] = useState(false)
   const [schedules, setSchedules] = useState([])
   const [activeTab, setActiveTab] = useState('ride')
+  const [selectedSchedule, setSelectedSchedule] = useState(null)
+  const [userInterests, setUserInterests] = useState([])
+  const [interestsLoading, setInterestsLoading] = useState(false)
+  const [podcastTopic, setPodcastTopic] = useState('')
+  const [podcastScript, setPodcastScript] = useState('')
+  const [podcastAudioUrl, setPodcastAudioUrl] = useState('')
+  const [podcastError, setPodcastError] = useState('')
+  const [podcastLoading, setPodcastLoading] = useState(false)
+  const [podcastOfflineReady, setPodcastOfflineReady] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
     if (user) {
-      setCurrentScreen('main')
+      if (currentScreen === 'welcome' || currentScreen === 'signin') {
+        setCurrentScreen('main')
+      }
       return
     }
     if (currentScreen === 'main') {
       setCurrentScreen('welcome')
     }
   }, [authLoading, user, currentScreen])
+
+  useEffect(() => {
+    if (!podcastAudioUrl) return () => {}
+    return () => {
+      URL.revokeObjectURL(podcastAudioUrl)
+    }
+  }, [podcastAudioUrl])
+
+  useEffect(() => {
+    if (!selectedSchedule) return
+    setPodcastError('')
+    setPodcastScript('')
+    setPodcastAudioUrl('')
+    setPodcastOfflineReady(false)
+    setPodcastTopic('')
+  }, [selectedSchedule])
+
+  useEffect(() => {
+    if (currentScreen !== 'podcast') return
+    if (!user || !hasSupabaseConfig || !supabase) {
+      setUserInterests([])
+      return
+    }
+    setInterestsLoading(true)
+    supabase
+      .from('user_preferences')
+      .select('interests')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          setUserInterests([])
+          return
+        }
+        setUserInterests(Array.isArray(data?.interests) ? data.interests : [])
+      })
+      .finally(() => setInterestsLoading(false))
+  }, [currentScreen, user])
+
+  useEffect(() => {
+    if (currentScreen !== 'podcast') return
+    if (!selectedSchedule) return
+    if (podcastTopic.trim()) return
+    setPodcastTopic(suggestedTopic(userInterests, selectedSchedule?.time))
+  }, [currentScreen, selectedSchedule, userInterests, podcastTopic])
 
   const handleWelcomeDone = () => {
     setCurrentScreen('city')
@@ -290,6 +389,10 @@ export default function App() {
 
   const handleEmailContinue = async ({ email, password, displayName }) => {
     setSignUpError(null)
+    if (!hasSupabaseConfig || !supabase) {
+      setCurrentScreen('interests')
+      return
+    }
     const { error: authError } = await signUpWithPassword({ email, password, displayName })
     if (authError) {
       setSignUpError(authError.message || 'Could not sign up. Please try again.')
@@ -331,7 +434,31 @@ export default function App() {
     setCurrentScreen('email')
   }
 
-  const handleInterestsComplete = (_interests) => {
+  const handleInterestsComplete = async (_interests) => {
+    setInterestsError('')
+    if (!user) {
+      setInterestsError('Please sign in to save your interests.')
+      return
+    }
+    if (!hasSupabaseConfig || !supabase) {
+      setInterestsError('Supabase is not configured.')
+      return
+    }
+    setInterestsSaving(true)
+    const { error: upsertError } = await supabase
+      .from('user_preferences')
+      .upsert(
+        {
+          user_id: user.id,
+          interests: _interests,
+        },
+        { onConflict: 'user_id' }
+      )
+    setInterestsSaving(false)
+    if (upsertError) {
+      setInterestsError(upsertError.message || 'Could not save interests. Please try again.')
+      return
+    }
     setCurrentScreen('success')
   }
 
@@ -348,6 +475,88 @@ export default function App() {
 
   const handleSuccessEditPreferences = () => {
     setCurrentScreen('city')
+  }
+
+  const handleSelectRoute = (schedule) => {
+    setSelectedSchedule(schedule)
+    setCurrentScreen('podcast')
+  }
+
+  const handlePodcastBack = () => {
+    setCurrentScreen('main')
+  }
+
+  const startLocationLabel = selectedLabel(startSelected) || startQuery.trim() || 'Current location'
+  const endLocationLabel = selectedLabel(endSelected) || endQuery.trim() || 'Destination'
+
+  const handleGeneratePodcast = async () => {
+    if (!selectedSchedule) return
+    setPodcastError('')
+    setPodcastLoading(true)
+
+    const durationMinutes = Math.max(1, Math.round(selectedSchedule.time || DEFAULT_PODCAST_MIN))
+    const payload = {
+      interests: userInterests,
+      route_duration_minutes: durationMinutes,
+      topic_override: podcastTopic?.trim(),
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/podcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setPodcastError(data.error || 'Could not generate podcast. Please try again.')
+        setPodcastLoading(false)
+        return
+      }
+      const audioBlob = base64ToBlob(data.audio_base64, 'audio/mpeg')
+      const audioUrl = URL.createObjectURL(audioBlob)
+      setPodcastAudioUrl(audioUrl)
+      setPodcastScript(data.script || '')
+      setPodcastTopic(data.topic || podcastTopic)
+
+      let cacheKey = `local-${Date.now()}`
+      if (user && hasSupabaseConfig && supabase) {
+        const routeData = {
+          schedule: selectedSchedule,
+          duration_minutes: durationMinutes,
+          podcast: {
+            topic: data.topic || podcastTopic,
+            interests: userInterests,
+            generated_at: new Date().toISOString(),
+          },
+        }
+        const { data: inserted, error } = await supabase
+          .from('journeys')
+          .insert({
+            user_id: user.id,
+            start_location: startLocationLabel,
+            end_location: endLocationLabel,
+            route_data: routeData,
+          })
+          .select('id')
+          .single()
+
+        if (!error && inserted?.id) {
+          cacheKey = inserted.id
+        }
+      }
+
+      try {
+        await savePodcastAudio(cacheKey, audioBlob)
+        setPodcastOfflineReady(true)
+      } catch {
+        setPodcastOfflineReady(false)
+      }
+    } catch (err) {
+      setPodcastError(err.message || 'Network error. Please try again.')
+    } finally {
+      setPodcastLoading(false)
+    }
   }
 
   const hasStart = (startSelected && startSelected.id) || startQuery.trim()
@@ -433,6 +642,27 @@ export default function App() {
       <InterestsScreen
         onComplete={handleInterestsComplete}
         onBack={handleInterestsBack}
+        saving={interestsSaving}
+        errorMessage={interestsError}
+      />
+    )
+  }
+
+  if (currentScreen === 'podcast') {
+    return (
+      <PodcastScreen
+        onBack={handlePodcastBack}
+        topic={podcastTopic}
+        onTopicChange={setPodcastTopic}
+        onGenerate={handleGeneratePodcast}
+        generating={podcastLoading}
+        errorMessage={podcastError}
+        audioUrl={podcastAudioUrl}
+        durationMinutes={selectedSchedule?.time}
+        interests={interestsLoading ? [] : userInterests}
+        routeSummary={`${startLocationLabel} → ${endLocationLabel}`}
+        offlineReady={podcastOfflineReady}
+        script={podcastScript}
       />
     )
   }
@@ -500,7 +730,7 @@ export default function App() {
                         selected={startSelected}
                         onSelect={(r) => {
                           setStartSelected(r)
-                          setStartQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
+                          if (r) setStartQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
                         }}
                         onChange={(v) => { setStartQuery(v); setStartSelected(null) }}
                         disabled={loading}
@@ -535,7 +765,7 @@ export default function App() {
                         selected={endSelected}
                         onSelect={(r) => {
                           setEndSelected(r)
-                          setEndQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
+                          if (r) setEndQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
                         }}
                         onChange={(v) => { setEndQuery(v); setEndSelected(null) }}
                         disabled={loading}
@@ -618,7 +848,12 @@ export default function App() {
                       <span className="text-sm text-gray-500">{schedules.length} options</span>
                     </div>
                     {schedules.map((schedule, i) => (
-                      <RouteOption key={schedule.routeId ?? i} schedule={schedule} index={i} />
+                      <RouteOption
+                        key={schedule.routeId ?? i}
+                        schedule={schedule}
+                        index={i}
+                        onSelect={handleSelectRoute}
+                      />
                     ))}
                   </section>
                 )}
