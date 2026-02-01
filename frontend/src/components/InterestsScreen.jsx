@@ -3,6 +3,7 @@
  * Card-based selection with smooth animations. Tap category → detail → pick interests.
  */
 import { useState } from 'react'
+/* eslint-disable-next-line no-unused-vars -- motion used as namespace in JSX (motion.div, motion.button, etc.) */
 import { motion, AnimatePresence } from 'framer-motion'
 
 const MIN_INTERESTS = 3
