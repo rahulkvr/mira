@@ -216,7 +216,7 @@ function getLineStyle(line) {
   return { ...FALLBACK_COLOR, label }
 }
 
-function RouteOption({ schedule, index, onSelect }) {
+function RouteOption({ schedule, index: _index, onSelect }) {
   const elements = schedule.scheduleElements || []
   const totalMin = schedule.time
   const walkMin = schedule.footpathTime || 0
