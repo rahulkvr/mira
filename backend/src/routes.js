@@ -278,10 +278,46 @@ async function handleAnnouncements(req, res) {
 router.get('/announcements', handleAnnouncements);
 router.post('/announcements', handleAnnouncements);
 
+/** Static fallback when ElevenLabs /v1/voices is unavailable (no key or network). */
+const PRESET_VOICES = [
+  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
+  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam' },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie' },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam' },
+  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura' },
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah' },
+];
+
+/**
+ * GET /api/podcast/voices
+ * Returns { voices: [{ id, name }, ...] } for the Voice picker. Uses ElevenLabs API when key is set; else preset list.
+ */
+router.get('/podcast/voices', async (req, res) => {
+  const elevenKey = process.env.ELEVENLABS_API_KEY;
+  if (!elevenKey) {
+    return res.json({ voices: PRESET_VOICES });
+  }
+  try {
+    const { data } = await axios.get('https://api.elevenlabs.io/v1/voices', {
+      headers: { 'xi-api-key': elevenKey, accept: 'application/json' },
+      timeout: 10000,
+    });
+    const list = Array.isArray(data?.voices) ? data.voices : [];
+    const voices = list
+      .map((v) => ({ id: v.voice_id, name: v.name || v.voice_id }))
+      .filter((v) => v.id && v.name)
+      .slice(0, 50);
+    return res.json({ voices: voices.length ? voices : PRESET_VOICES });
+  } catch (err) {
+    console.warn('GET /api/podcast/voices error:', err.message);
+    return res.json({ voices: PRESET_VOICES });
+  }
+});
+
 /**
  * POST /api/podcast/suggest-topics
- * Body: { interests?: string[], route_summary?: string, duration_minutes?: number }
- * Returns: { suggestions: string[] } — 3–5 topic ideas from Gemini (varied, engaging).
+ * Body: { interests?: string[], route_summary?: string, duration_minutes?: number, feeling_lucky?: boolean }
+ * Returns: { suggestions: string[] } — 3–5 topic ideas. If feeling_lucky, topics are outside listener interests (surprise me).
  */
 router.post('/podcast/suggest-topics', async (req, res) => {
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -292,21 +328,28 @@ router.post('/podcast/suggest-topics', async (req, res) => {
     const interests = normalizeInterests(req.body?.interests);
     const routeSummary = (req.body?.route_summary || '').trim();
     const durationMinutes = clampDuration(req.body?.duration_minutes);
+    const feelingLucky = Boolean(req.body?.feeling_lucky);
     const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
     const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`;
 
-    const prompt = [
-      'Suggest 3–5 short, engaging podcast topic titles for a commute podcast.',
-      `Trip: ~${durationMinutes} minutes. ${routeSummary ? `Route: ${routeSummary}.` : ''}`,
-      interests.length ? `Listener interests: ${interests.join(', ')}.` : 'General commute audience.',
-      'Make topics varied, timely, and fun — e.g. quick tips, trending angles, or stories that fit the ride. Return valid JSON only: {"suggestions": ["Topic one", "Topic two", ...]}',
-    ].join('\n');
+    const prompt = feelingLucky
+      ? [
+          'I\'m feeling lucky: suggest 3–5 SHORT podcast topic titles that are OUTSIDE the listener\'s usual interests — surprising, weird, or "did you know" style.',
+          interests.length ? `Their usual interests (avoid these): ${interests.join(', ')}.` : 'Assume they like typical commute content; suggest something different.',
+          'Ideas: bizarre history, underrated inventions, random science, a topic from a completely different field, or something they would never search for. Make each title catchy and intriguing. Return valid JSON only: {"suggestions": ["Topic one", "Topic two", ...]}',
+        ].join(' ')
+      : [
+          'Suggest 3–5 short, engaging podcast topic titles for a commute podcast.',
+          `Trip: ~${durationMinutes} minutes. ${routeSummary ? `Route: ${routeSummary}.` : ''}`,
+          interests.length ? `Listener interests: ${interests.join(', ')}.` : 'General commute audience.',
+          'Make topics varied, timely, and fun — e.g. quick tips, trending angles, or stories that fit the ride. Return valid JSON only: {"suggestions": ["Topic one", "Topic two", ...]}',
+        ].join('\n');
 
     const { data } = await axios.post(
       `${geminiEndpoint}?key=${geminiKey}`,
       {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.8, maxOutputTokens: 512 },
+        generationConfig: { temperature: feelingLucky ? 1.0 : 0.8, maxOutputTokens: 512 },
       },
       { timeout: 15000 }
     );
@@ -444,6 +487,33 @@ function extractJson(text) {
   return match ? match[0] : null
 }
 
+/** Strip title/section/meta from start of a section so TTS gets pure content only. */
+function stripSectionIntro(text) {
+  if (!text || typeof text !== 'string') return text
+  let s = text.trim()
+  const patterns = [
+    /^Section\s+\d+[.:]\s*/i,
+    /^Part\s+(one|\d+)[.:]\s*/i,
+    /^Today\s+(we're|we are)\s+(talking about|discussing|covering)[^.]*\.\s*/i,
+    /^In this (episode|podcast)[^.]*\.\s*/i,
+    /^Welcome to[^.]*\.\s*/i,
+    /^This is (your |the )[^.]*\.\s*/i,
+    /^Hey (everyone|guys|there)[^.]*\.\s*/i,
+    /^So (today|this (episode|time))[^.]*\.\s*/i,
+    /^\[.*?\]\s*/,
+    /^(The )?topic (today|for this (episode|ride))[^.]*\.\s*/i,
+    /^Here('s| is) (what we're |your )[^.]*\.\s*/i,
+  ]
+  let prev = ''
+  while (prev !== s) {
+    prev = s
+    for (const p of patterns) {
+      s = s.replace(p, '').trim()
+    }
+  }
+  return s || text.trim()
+}
+
 /** Split script into chunks of ~400-600 chars (~1-2 min each) for parallel TTS. */
 function splitIntoChunks(text, targetChunkChars = 500) {
   const trimmed = String(text || '').trim()
@@ -540,6 +610,22 @@ function getTimeOfDayContext(localTimeStr) {
   return 'Evening'
 }
 
+/** Mood → Gemini tone + ElevenLabs voice_settings. Lower stability = more expressive, less monotonous. */
+const MOOD_CONFIG = {
+  slow: { tone: 'relaxed, reflective, warm. Calm pacing. Opening: warm and inviting, not loud.', stability: 0.42, similarity_boost: 0.76 },
+  energetic: { tone: 'upbeat, engaging. Steady energy. Opening: punchy hook.', stability: 0.22, similarity_boost: 0.72 },
+  fast: { tone: 'punchy, quick cuts, snappy. Higher pace. Opening: bold, attention-grabbing.', stability: 0.18, similarity_boost: 0.70 },
+  hyper: { tone: 'high energy, excited, radio-jockey style. Maximum energy. Opening: explosive hook.', stability: 0.14, similarity_boost: 0.68 },
+}
+
+/**
+ * POST /api/podcast
+ * Body: { journey?, interests?, topic_override?, mood?, voice_id?, feeling_lucky?, regenerate? }
+ * - mood: 'slow'|'energetic'|'fast'|'hyper' — used in Gemini prompt and ElevenLabs stability.
+ * - voice_id: optional ElevenLabs voice ID per request; if omitted, uses ELEVENLABS_VOICE_ID from env.
+ * - feeling_lucky: surprising topic outside listener interests.
+ * - regenerate: different angle/tone/structure.
+ */
 router.post('/podcast', async (req, res) => {
   const geminiKey = process.env.GEMINI_API_KEY
   const elevenKey = process.env.ELEVENLABS_API_KEY
@@ -554,6 +640,12 @@ router.post('/podcast', async (req, res) => {
     )
     const interests = normalizeInterests(req.body?.interests)
     const topicOverride = (req.body?.topic_override || '').trim()
+    const moodRaw = (req.body?.mood || 'energetic').toLowerCase()
+    const mood = MOOD_CONFIG[moodRaw] ? moodRaw : 'energetic'
+    const moodConfig = MOOD_CONFIG[mood]
+    const feelingLucky = Boolean(req.body?.feeling_lucky)
+    const regenerate = Boolean(req.body?.regenerate)
+    const voiceIdOverride = (req.body?.voice_id ?? req.body?.voiceId ?? '').trim()
     const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
     const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
 
@@ -581,26 +673,54 @@ router.post('/podcast', async (req, res) => {
             .join('\n')
         : ''
 
+    // Creative, dynamic prompt: PURE CONTENT ONLY — no title, no section labels, no meta
+    const hostPersona = [
+      'You write ONLY the spoken words. No title, no section labels, no meta.',
+      'FORBIDDEN: Do NOT start with or include: the topic title, "Section 1", "Part 1", "In this episode", "Today we\'re discussing", "Welcome to", "This is your…", or any intro that names the show or episode. Real podcasts often jump straight into content — so must this. The very first word of the first section must be the hook: a question, a bold claim, or a fact — not a greeting or title.',
+      `TONE AND PACING (strict): ${moodConfig.tone}`,
+      'Vary delivery: mix short punchy sentences with longer ones. Use hooks, callbacks, surprises. Sound like a sharp, curious host — not a script reader.',
+    ].join(' ')
+    let topicInterestsBlock = ''
+    if (feelingLucky) {
+      topicInterestsBlock = [
+        'FEELING LUCKY MODE: Ignore the listener\'s usual interests. Pick something SURPRISING and NEW: a topic they would never search for — e.g. a weird history fact, an underrated invention, a bizarre science story, or a "did you know" from a completely different field. Make it fascinating and shareable.',
+        topicOverride ? `Suggested angle: "${topicOverride}". Run with it in an unexpected way.` : 'Choose one surprising topic that would make someone say "I never thought I\'d care about that."',
+      ].join(' ')
+    } else if (regenerate) {
+      topicInterestsBlock = [
+        'REGENERATE MODE: The user just asked for a DIFFERENT podcast. Give a completely different angle, tone, or framing. Use different examples, a different hook, and a different structure. Do NOT repeat the same opening or content.',
+        `Interests (use them but from a fresh angle): ${interests.length ? interests.join(', ') : 'general commute, light news'}.`,
+        topicOverride ? `Topic: "${topicOverride}". Approach it in a new way.` : 'Pick a topic that fits the interests but present it in an entirely new way.',
+      ].join(' ')
+    } else {
+      topicInterestsBlock = [
+        'INTERESTS (mandatory — the script MUST draw directly from these):',
+        interests.length
+          ? `${interests.map((i) => `- ${i.replace(/[-_]/g, ' ')}`).join('\n')}. Weave in specific content for EACH: e.g. tech/coding → tips, tools, or news; music/lofi → vibes, artists, or culture; sports → stories, stats, or drama. Do not give a generic script — reference the actual interest labels and make the listener feel it was built for them.`
+          : 'General commute, light news, curious about the world. Keep it engaging and specific.',
+        topicOverride ? `Topic/angle: "${topicOverride}". Tie it to the interests above where natural.` : 'Suggest a topic that fits the interests and that you can make genuinely engaging — not generic.',
+      ].join(' ')
+    }
     const prompt = [
-      'You are a high-energy, warm, and really friendly podcast host. Never sound boring, dull, or monotone. Sound like an enthusiastic friend on the commute — fun and lively, not calm or meditative. Be upbeat, engaging, and conversational.',
-      `Create a commute podcast script that fills the whole trip. Total length: ~${durationMinutes} minutes. Split into exactly ${numSections} sections.`,
-      `Each section: ~${wordsPerSection} words. Total script must match the trip duration. Interests: ${interests.length ? interests.join(', ') : 'general commute, light news, mindful focus'}.`,
-      topicOverride ? `Topic: "${topicOverride}".` : 'Suggest a topic that fits the interests.',
+      hostPersona,
+      `Write ONLY what the host says. Total length: ~${durationMinutes} minutes. Split into exactly ${numSections} sections. Each section: ~${wordsPerSection} words.`,
+      topicInterestsBlock,
       journeyBlock
-        ? `${journeyBlock}\nWeave in the journey: mention the start, each leg (line and stations), and destination. Align section content with segments (e.g. "as you leave X on the S1…", "when you reach Y…").`
+        ? `${journeyBlock}\nWeave in the journey naturally (e.g. "as you leave X on the S1…", "when you reach Y…").`
         : '',
-      'Return valid JSON only: {"topic":"...","sections":["section1 text","section2 text",...]}',
-      'No markdown, no extra formatting.',
+      'CRITICAL: "topic" is for the app UI only — the host must NEVER say it. Each section is ONLY spoken content: no "Section 1", no "Part one", no title, no "Today we\'re talking about…". First section = hook only (question, claim, or fact).',
+      'Return valid JSON only: {"topic":"...","sections":["section1 text","section2 text",...]}. No markdown.',
     ]
       .filter(Boolean)
       .join('\n')
 
+    const creativityTemp = feelingLucky || regenerate ? 1.0 : 0.9
     const geminiResponse = await axios.post(
       `${geminiEndpoint}?key=${geminiKey}`,
       {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.7,
+          temperature: creativityTemp,
           maxOutputTokens: Math.min(4096, Math.max(1024, durationMinutes * 200)),
         },
       },
@@ -620,7 +740,7 @@ router.post('/podcast', async (req, res) => {
         if (parsed?.topic) topic = parsed.topic
         if (Array.isArray(parsed?.sections) && parsed.sections.length > 0) {
           sections = parsed.sections
-            .map((s) => String(s || '').trim())
+            .map((s) => stripSectionIntro(String(s || '').trim()))
             .filter(Boolean)
             .slice(0, 6)
         }
@@ -638,22 +758,27 @@ router.post('/podcast', async (req, res) => {
           singleScript = rawText
         }
       }
-      sections = splitIntoChunks(singleScript)
+      sections = splitIntoChunks(singleScript).map(stripSectionIntro)
     }
     if (sections.length === 0) {
       sections = [
-        `Hey, welcome to your ride! Let's make this trip fly. You've got this — here we go!`,
+        `Alright — let's go. You're on the move and we're making this count. Here we go!`,
       ]
     }
 
-    const voiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
+    // Voice ID: per-request (voice_id in body) or fallback to env. Dynamic = client can send a different voice each time.
+    const voiceId = voiceIdOverride || process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
     const ttsModel = process.env.ELEVENLABS_MODEL || 'eleven_flash_v2_5'
     const ttsHeaders = {
       'xi-api-key': elevenKey,
       accept: 'audio/mpeg',
       'content-type': 'application/json',
     }
-    const voiceSettings = { stability: 0.35, similarity_boost: 0.8 }
+    // Mood → ElevenLabs: stability (lower = more expressive), similarity_boost
+    const voiceSettings = {
+      stability: moodConfig.stability,
+      similarity_boost: moodConfig.similarity_boost,
+    }
 
     const ttsResults = []
     for (const text of sections) {

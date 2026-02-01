@@ -1,0 +1,23 @@
+# Podcast Generation Changes Rule
+
+**Scope:** All improvements, fixes, or feature changes related to **podcast generation** must be implemented **only** in:
+
+- **`backend/src/routes.js`**
+
+## What counts as "podcast generation"
+
+- Script content, tone, structure, length (Gemini prompt and config)
+- Topic and interest suggestions (`/api/podcast/suggest-topics`, `/api/podcast/suggest-interests`)
+- TTS / voice settings (ElevenLabs model, voice id, chunking)
+- Journey-aware logic (segment timeline, `buildSegmentTimeline`, `splitIntoChunks`, `getTimeOfDayContext`)
+- Request/response shape for `POST /api/podcast` (payload, error handling, response fields)
+
+## What NOT to change for podcast improvements
+
+- Do **not** modify `frontend/src/App.jsx` or `frontend/src/components/InterestsScreen.jsx` for podcast changes
+- Do **not** modify frontend components (e.g. PodcastScreen, PodcastPlayer) unless the user explicitly asks for UI/frontend changes
+- Do **not** add new backend files for podcast logic—keep it in `backend/src/routes.js`
+
+## Summary
+
+For any user suggestion about improving the podcast: apply edits **only** in `backend/src/routes.js`.

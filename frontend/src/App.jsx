@@ -542,7 +542,7 @@ export default function App() {
   const startLocationLabel = selectedLabel(startSelected) || startQuery.trim() || 'Current location'
   const endLocationLabel = selectedLabel(endSelected) || endQuery.trim() || 'Destination'
 
-  const handleGeneratePodcast = async () => {
+  const handleGeneratePodcast = async (options = {}) => {
     if (!selectedSchedule) return
     setPodcastError('')
     setPodcastLoading(true)
@@ -570,6 +570,8 @@ export default function App() {
       route_duration_minutes: durationMinutes,
       topic_override: podcastTopic?.trim(),
       journey,
+      mood: options.mood || 'energetic',
+      ...(options.voice_id && { voice_id: options.voice_id }),
     }
 
     try {
@@ -793,6 +795,7 @@ export default function App() {
         audioUrl={podcastAudioUrl}
         durationMinutes={selectedSchedule?.time}
         interests={interestsLoading ? [] : userInterests}
+        interestsLoading={interestsLoading}
         routeSummary={`${startLocationLabel} → ${endLocationLabel}`}
         offlineReady={podcastOfflineReady}
         script={podcastScript}
