@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
 
-export function MicroMasterViewer({ slides = [], topic = '', onBack }) {
+export function MicroMasterViewer({ slides = [], topic: _topic = '', onBack }) {
   const containerRef = useRef(null)
   const audioRefs = useRef({})
   const [activeIndex, setActiveIndex] = useState(0)
