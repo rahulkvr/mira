@@ -3,14 +3,17 @@
  * First screen: logo, train illustration, headline, Get started (primary), Sign in (returning users).
  */
 import trainSunrise from '../assets/train-sunrise.png'
-import miraLogo from '../assets/mira-logo.png'
 
 export function WelcomeScreen({ onGetStarted, onSignIn }) {
   return (
     <div className="h-dvh min-h-dvh max-h-dvh overflow-hidden flex flex-col px-6 pt-12 pb-10 bg-[#F7F3EE]">
-      {/* Top Logo */}
-      <div className="shrink-0">
-        <img src={miraLogo} alt="MIRA" className="h-8 w-auto" />
+      {/* Top Logo — centered, trimmed to color borders */}
+      <div className="shrink-0 flex justify-center">
+        <img
+          src="/MIRA-logo-trimmed.png"
+          alt="MIRA"
+          className="h-20 w-auto"
+        />
       </div>
 
       {/* Center Content */}

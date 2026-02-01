@@ -1,5 +1,6 @@
 /**
- * Main app header — MIRA logo + profile button (matches Commute Companion).
+ * Main app header — MIRA logo (left) + profile (right).
+ * First element on ride/explore/profile; pt-6 and pb-4 define top spacing and gap to content.
  */
 function UserIcon({ className }) {
   return (
@@ -12,16 +13,20 @@ function UserIcon({ className }) {
 
 export function AppHeader({ onProfileClick, userName }) {
   return (
-    <header className="flex justify-between items-center py-8 px-6 max-w-md mx-auto">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-sm text-gray-900">M</div>
-        <span className="font-bold tracking-tight text-gray-900 uppercase text-xs tracking-[0.2em]">Mira</span>
+    <header className="flex justify-between items-center h-14 pt-10 px-4 pb-8 w-full gap-3">
+      {/* Logo: trimmed to color borders, no transparent padding */}
+      <div className="shrink-0 flex items-center h-10">
+        <img
+          src="/MIRA-logo-trimmed.png"
+          alt="MIRA"
+          className="h-10 w-auto"
+        />
       </div>
       {onProfileClick && (
         <button
           type="button"
           onClick={onProfileClick}
-          className="p-2 rounded-full bg-white shadow-ios flex items-center gap-2"
+          className="p-2 rounded-full bg-white shadow-ios flex items-center justify-center shrink-0 size-10"
           aria-label="Open profile"
         >
           <UserIcon className="w-5 h-5 text-gray-600" />

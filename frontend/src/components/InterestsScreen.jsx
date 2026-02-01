@@ -303,11 +303,11 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] relative overflow-hidden">
-      {/* Decorative background */}
+      {/* Decorative background — match EmailScreen / PodcastScreen / SuccessScreen */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-accent/10 blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-emerald-500/5 to-teal-500/10 blur-3xl" />
-        <div className="absolute top-1/3 left-1/2 w-72 h-72 rounded-full bg-gradient-to-br from-rose-500/5 to-pink-500/10 blur-3xl" />
+        <div className="absolute top-20 -right-20 w-56 h-56 rounded-full bg-gradient-to-br from-[#F0E8FF]/30 to-[#DDD0FF]/20 blur-3xl" />
+        <div className="absolute bottom-40 -left-16 w-48 h-48 rounded-full bg-gradient-to-br from-[#E0F5ED]/25 to-[#B8E8D4]/15 blur-3xl" />
+        <div className="absolute top-1/2 right-0 w-52 h-52 rounded-full bg-gradient-to-br from-[#FFE9A8]/20 to-[#FFCF6B]/15 blur-3xl" />
       </div>
 
       <div className="relative z-10 max-w-2xl mx-auto px-5 py-8 min-h-screen flex flex-col">
@@ -321,9 +321,9 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
             <button
               type="button"
               onClick={onBack}
-              className="flex items-center gap-1.5 text-gray-500 text-sm mb-6 hover:text-[#1F1F1F] transition-colors group"
+              className="flex items-center gap-1.5 text-gray-500 text-sm mb-6 active:opacity-70 transition-opacity"
             >
-              <ChevronLeftIcon className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+              <ChevronLeftIcon className="w-4 h-4" />
               Back
             </button>
           )}
@@ -335,17 +335,17 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
           </p>
         </motion.div>
 
-        {/* Selection counter pill */}
+        {/* Selection counter — same card style as EmailScreen / SuccessScreen */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
           className="mb-6 shrink-0"
         >
-          <div className="inline-flex items-center gap-3 flex-wrap">
+          <div className="inline-flex items-center gap-3 flex-wrap rounded-2xl border border-gray-100 bg-white/90 px-4 py-2.5 shadow-sm">
             <div className="flex items-center gap-2">
               <motion.span
-                className="h-5 min-w-[1.25rem] px-1.5 rounded-full bg-primary inline-flex items-center justify-center text-white text-xs font-semibold leading-none"
+                className="h-6 min-w-[1.5rem] px-1.5 rounded-full bg-[#1F1F1F] text-white inline-flex items-center justify-center text-xs font-semibold leading-none"
                 key={selectedInterests.length}
                 initial={{ scale: 1.2 }}
                 animate={{ scale: 1 }}
@@ -356,7 +356,7 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
               <span className="text-sm font-medium text-[#1F1F1F] leading-5">selected</span>
             </div>
             {!isValid && (
-              <span className="text-sm text-gray-500">{remaining} more to go</span>
+              <span className="text-sm font-medium text-gray-500">{remaining} more to go</span>
             )}
             {isValid && (
               <motion.div
@@ -398,7 +398,7 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
                       onClick={() => setActiveCategory(category.id)}
                       className={`group relative w-full p-5 rounded-2xl text-left transition-all duration-300
                         bg-gradient-to-br ${category.gradient} border border-white/50
-                        hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]
+                        active:scale-[0.98]
                         shadow-sm`}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -416,12 +416,12 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
                             <motion.div
                               initial={{ scale: 0 }}
                               animate={{ scale: 1 }}
-                              className="px-3 py-1 rounded-full bg-primary text-white text-xs font-semibold"
+                              className="px-3 py-1 rounded-full bg-[#1F1F1F] text-white text-xs font-semibold"
                             >
                               {selectedCount} picked
                             </motion.div>
                           )}
-                          <div className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center group-hover:bg-white transition-colors">
+                          <div className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center">
                             <ChevronLeftIcon className="w-4 h-4 text-[#1F1F1F] rotate-180" />
                           </div>
                         </div>
@@ -449,11 +449,10 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
               type="button"
               onClick={() => onComplete(selectedInterests)}
               disabled={!isValid || saving}
-              whileHover={isValid && !saving ? { scale: 1.02 } : {}}
               whileTap={isValid && !saving ? { scale: 0.98 } : {}}
               className={`w-full h-14 rounded-2xl font-semibold text-base transition-all duration-300
                 ${isValid && !saving
-                  ? 'bg-primary text-white shadow-lg hover:shadow-xl'
+                  ? 'bg-[#1F1F1F] text-white shadow-lg'
                   : 'bg-[#E8E3DD] text-[#6B6B6B] cursor-not-allowed'
                 }`}
             >
@@ -494,9 +493,9 @@ function CategoryDetail({ category, selectedInterests, onToggle, onBack }) {
       <button
         type="button"
         onClick={onBack}
-        className="flex items-center gap-2 text-gray-500 text-sm mb-6 hover:text-[#1F1F1F] transition-colors group"
+        className="flex items-center gap-2 text-gray-500 text-sm mb-6 active:opacity-70 transition-opacity"
       >
-        <ChevronLeftIcon className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+        <ChevronLeftIcon className="w-4 h-4" />
         All categories
       </button>
 
@@ -532,8 +531,8 @@ function CategoryDetail({ category, selectedInterests, onToggle, onBack }) {
                 }}
                 className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-200
                   ${isSelected && !hasSubInterests
-                    ? 'bg-primary text-white shadow-md'
-                    : 'bg-white border border-gray-100 hover:border-primary/30 hover:shadow-sm'
+                    ? 'bg-[#1F1F1F] text-white shadow-md'
+                    : 'bg-white border border-gray-100 active:scale-[0.98]'
                   }`}
               >
                 <span className="text-2xl">{interest.emoji}</span>
@@ -541,7 +540,7 @@ function CategoryDetail({ category, selectedInterests, onToggle, onBack }) {
                 {hasSubInterests ? (
                   <div className="flex items-center gap-2">
                     {selectedSubCount > 0 && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-primary text-white text-xs font-semibold">
+                      <span className="px-2.5 py-0.5 rounded-full bg-[#1F1F1F] text-white text-xs font-semibold">
                         {selectedSubCount}
                       </span>
                     )}
@@ -582,8 +581,8 @@ function CategoryDetail({ category, selectedInterests, onToggle, onBack }) {
                             onClick={() => onToggle(sub.id)}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
                               ${isSubSelected
-                                ? 'bg-primary text-white shadow-md'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                ? 'bg-[#1F1F1F] text-white shadow-md'
+                                : 'bg-gray-100 text-gray-700 active:opacity-80'
                               }`}
                           >
                             <span>{sub.emoji}</span>
