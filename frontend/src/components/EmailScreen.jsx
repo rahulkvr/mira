@@ -88,13 +88,15 @@ export function EmailScreen({ onContinue, onSkip, onBack, errorMessage }) {
   }
 
   return (
-    <div className="h-dvh min-h-dvh max-h-dvh overflow-hidden flex flex-col px-6 pt-14 pb-10 bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] relative">
+    <div className="h-dvh min-h-dvh max-h-dvh min-h-0 overflow-hidden flex flex-col px-6 pt-14 pb-safe-bottom bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] relative">
       {/* Decorative blobs */}
       <div className="absolute top-32 -right-20 w-56 h-56 rounded-full bg-gradient-to-br from-[#E4F0FF]/35 to-[#C8DFFF]/20 blur-3xl pointer-events-none" aria-hidden />
       <div className="absolute bottom-40 -left-16 w-48 h-48 rounded-full bg-gradient-to-br from-[#FFEDE4]/30 to-[#FFD9C8]/20 blur-3xl pointer-events-none" aria-hidden />
 
+      {/* Scrollable content: header + form + info card */}
+      <div className="flex-1 min-h-0 overflow-y-auto relative z-10 -mx-6 px-6">
       {/* Header */}
-      <div className="mb-8 relative z-10 shrink-0">
+      <div className="mb-8 shrink-0">
         {onBack && (
           <button
             type="button"
@@ -253,9 +255,10 @@ export function EmailScreen({ onContinue, onSkip, onBack, errorMessage }) {
           </div>
         </div>
       </div>
+      </div>
 
-      {/* CTA */}
-      <div className="pt-6 shrink-0 relative z-10 mt-auto">
+      {/* CTA: fixed at bottom (root has pb-safe-bottom for safe area) */}
+      <div className="pt-4 shrink-0 relative z-10">
         <button
           type="button"
           onClick={handleContinue}
