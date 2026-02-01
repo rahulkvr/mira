@@ -4,6 +4,9 @@
 
 MIRA transforms the "dead time" of daily transit into a tailored period of learning, relaxation, or entertainment. By syncing real-time public transit data with generative AI, MIRA creates high-quality, long-form content that fits your journey's exact duration and physical route.
 
+## Notice to testers
+# Use location as Hamburg (we are expanding to further locations later). Example of start location: Hamburg Hbf, Example of end location: Heimfeld
+
 ## 🚀 The Vision
 Commuting is the often the most unproductive part of any day. MIRA solves the "timing mismatch" of podcasts and books by generating a **Journey Stream**: a curated mix of audio/visual content that ends exactly when you arrive at your stop.
 
