@@ -12,7 +12,18 @@ const INTEREST_CATEGORIES = [
     title: 'Learning & Growth',
     emoji: '📚',
     interests: [
-      { id: 'languages', label: 'Languages', emoji: '🌍' },
+      {
+        id: 'languages',
+        label: 'Languages',
+        emoji: '🌍',
+        subInterests: [
+          { id: 'language-german', label: 'German', emoji: '🇩🇪' },
+          { id: 'language-french', label: 'French', emoji: '🇫🇷' },
+          { id: 'language-spanish', label: 'Spanish', emoji: '🇪🇸' },
+          { id: 'language-english', label: 'English', emoji: '🇬🇧' },
+          { id: 'language-japanese', label: 'Japanese', emoji: '🇯🇵' },
+        ],
+      },
       { id: 'tech-coding', label: 'Tech & Coding', emoji: '💻' },
       { id: 'career-skills', label: 'Career Skills', emoji: '💼' },
       { id: 'academic-topics', label: 'Academic Topics', emoji: '📖' },
@@ -29,7 +40,18 @@ const INTEREST_CATEGORIES = [
       { id: 'news-current-events', label: 'News & Current Events', emoji: '📰' },
       { id: 'sports', label: 'Sports', emoji: '⚽' },
       { id: 'travel-places', label: 'Travel & Places', emoji: '✈️' },
-      { id: 'music-audio', label: 'Music & Audio', emoji: '🎵' },
+      {
+        id: 'music-audio',
+        label: 'Music & Audio',
+        emoji: '🎵',
+        subInterests: [
+          { id: 'music-pop', label: 'Pop', emoji: '🎤' },
+          { id: 'music-hiphop', label: 'Hip Hop', emoji: '🎧' },
+          { id: 'music-jazz', label: 'Jazz', emoji: '🎷' },
+          { id: 'music-classical', label: 'Classical', emoji: '🎻' },
+          { id: 'music-lofi', label: 'Lo-fi', emoji: '📼' },
+        ],
+      },
       { id: 'pop-culture', label: 'Pop Culture', emoji: '✨' },
     ],
   },
@@ -39,7 +61,18 @@ const INTEREST_CATEGORIES = [
     emoji: '🧘',
     interests: [
       { id: 'mindfulness-meditation', label: 'Mindfulness & Meditation', emoji: '🧘' },
-      { id: 'fitness-movement', label: 'Fitness & Movement', emoji: '💪' },
+      {
+        id: 'fitness-movement',
+        label: 'Fitness & Movement',
+        emoji: '💪',
+        subInterests: [
+          { id: 'fitness-yoga', label: 'Yoga', emoji: '🧘‍♀️' },
+          { id: 'fitness-running', label: 'Running', emoji: '🏃' },
+          { id: 'fitness-strength', label: 'Strength', emoji: '🏋️' },
+          { id: 'fitness-walking', label: 'Walking', emoji: '🚶' },
+          { id: 'fitness-cycling', label: 'Cycling', emoji: '🚴' },
+        ],
+      },
       { id: 'nature-outdoors', label: 'Nature & Outdoors', emoji: '🌲' },
       { id: 'relationships-connection', label: 'Relationships & Connection', emoji: '❤️' },
       { id: 'personal-growth', label: 'Personal Growth', emoji: '🌱' },
@@ -81,9 +114,10 @@ function CheckIcon({ className }) {
   )
 }
 
-export function InterestsScreen({ onComplete, onBack }) {
+export function InterestsScreen({ onComplete, onBack, saving = false, errorMessage = '' }) {
   const [selectedInterests, setSelectedInterests] = useState([])
   const [expandedCategoryId, setExpandedCategoryId] = useState(null)
+  const [expandedInterestId, setExpandedInterestId] = useState(null)
 
   const toggleInterest = (id) => {
     if (selectedInterests.includes(id)) {
@@ -95,6 +129,10 @@ export function InterestsScreen({ onComplete, onBack }) {
 
   const toggleCategory = (categoryId) => {
     setExpandedCategoryId((prev) => (prev === categoryId ? null : categoryId))
+  }
+
+  const toggleInterestGroup = (interestId) => {
+    setExpandedInterestId((prev) => (prev === interestId ? null : interestId))
   }
 
   const isValid = selectedInterests.length >= MIN_INTERESTS
@@ -129,6 +167,9 @@ export function InterestsScreen({ onComplete, onBack }) {
           {!isValid && <span className="text-sm text-gray-400">({remaining} more needed)</span>}
           {isValid && <CheckIcon className="w-4 h-4 text-[#009252]" />}
         </div>
+        {errorMessage && (
+          <p className="mt-2 text-sm text-red-500">{errorMessage}</p>
+        )}
       </div>
 
       {/* Interest hierarchy — expandable categories */}
@@ -164,28 +205,74 @@ export function InterestsScreen({ onComplete, onBack }) {
                   <div className="px-4 pb-4 pt-0 flex flex-wrap gap-2 border-t border-gray-50">
                     {category.interests.map((interest, index) => {
                       const isSelected = selectedInterests.includes(interest.id)
+                      const hasSubInterests = Array.isArray(interest.subInterests) && interest.subInterests.length > 0
+                      const isInterestExpanded = expandedInterestId === interest.id
+                      const selectedSubCount = hasSubInterests
+                        ? interest.subInterests.filter((sub) => selectedInterests.includes(sub.id)).length
+                        : 0
                       const subGradient = GRADIENTS[index % GRADIENTS.length]
                       return (
-                        <button
-                          key={interest.id}
-                          type="button"
-                          onClick={() => toggleInterest(interest.id)}
-                          className={`
-                            inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200
-                            ${isSelected
-                              ? `bg-gradient-to-br ${subGradient} text-[#1F1F1F] shadow-md`
-                              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
-                            }
-                          `}
-                        >
-                          <span>{interest.emoji}</span>
-                          <span>{interest.label}</span>
-                          {isSelected && (
-                            <div className="w-4 h-4 rounded-full bg-[#1F1F1F] flex items-center justify-center shrink-0">
-                              <CheckIcon className="w-2.5 h-2.5 text-white" />
+                        <div key={interest.id} className="w-full">
+                          <button
+                            type="button"
+                            onClick={() => (hasSubInterests ? toggleInterestGroup(interest.id) : toggleInterest(interest.id))}
+                            className={`
+                              inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200
+                              ${isSelected
+                                ? `bg-gradient-to-br ${subGradient} text-[#1F1F1F] shadow-md`
+                                : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                              }
+                            `}
+                          >
+                            <span>{interest.emoji}</span>
+                            <span>{interest.label}</span>
+                            {selectedSubCount > 0 && (
+                              <span className="text-[11px] font-semibold text-gray-500 bg-white/80 border border-gray-200 px-2 py-0.5 rounded-full">
+                                {selectedSubCount} selected
+                              </span>
+                            )}
+                            {hasSubInterests && (
+                              <ChevronDownIcon
+                                className={`w-4 h-4 text-gray-400 transition-transform ${isInterestExpanded ? 'rotate-180' : ''}`}
+                              />
+                            )}
+                            {isSelected && !hasSubInterests && (
+                              <div className="w-4 h-4 rounded-full bg-[#1F1F1F] flex items-center justify-center shrink-0">
+                                <CheckIcon className="w-2.5 h-2.5 text-white" />
+                              </div>
+                            )}
+                          </button>
+                          {hasSubInterests && isInterestExpanded && (
+                            <div className="mt-2 ml-6 flex flex-wrap gap-2">
+                              {interest.subInterests.map((subInterest, subIndex) => {
+                                const isSubSelected = selectedInterests.includes(subInterest.id)
+                                const subItemGradient = GRADIENTS[subIndex % GRADIENTS.length]
+                                return (
+                                  <button
+                                    key={subInterest.id}
+                                    type="button"
+                                    onClick={() => toggleInterest(subInterest.id)}
+                                    className={`
+                                      inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200
+                                      ${isSubSelected
+                                        ? `bg-gradient-to-br ${subItemGradient} text-[#1F1F1F] shadow-md`
+                                        : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                                      }
+                                    `}
+                                  >
+                                    <span>{subInterest.emoji}</span>
+                                    <span>{subInterest.label}</span>
+                                    {isSubSelected && (
+                                      <div className="w-3.5 h-3.5 rounded-full bg-[#1F1F1F] flex items-center justify-center shrink-0">
+                                        <CheckIcon className="w-2 h-2 text-white" />
+                                      </div>
+                                    )}
+                                  </button>
+                                )
+                              })}
                             </div>
                           )}
-                        </button>
+                        </div>
                       )
                     })}
                   </div>
@@ -201,16 +288,16 @@ export function InterestsScreen({ onComplete, onBack }) {
         <button
           type="button"
           onClick={() => onComplete(selectedInterests)}
-          disabled={!isValid}
+          disabled={!isValid || saving}
           className={`
             w-full h-14 px-8 py-4 rounded-full font-semibold text-base transition-all
-            ${isValid
+            ${isValid && !saving
               ? 'bg-[#1F1F1F] text-white shadow-lg hover:bg-[#2A2A2A] hover:shadow-xl active:scale-[0.98]'
               : 'bg-[#E8E3DD] text-[#6B6B6B] cursor-not-allowed'
             }
           `}
         >
-          {isValid ? 'Save interests' : `Select ${remaining} more`}
+          {saving ? 'Saving…' : (isValid ? 'Save interests' : `Select ${remaining} more`)}
         </button>
       </div>
     </div>

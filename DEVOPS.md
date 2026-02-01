@@ -142,6 +142,9 @@ In Render Dashboard > Service > Environment:
 | `GEOFOX_PASSWORD` | Your HVV API password |
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | Your Supabase anon key |
+| `GEMINI_API_KEY` | Your Gemini API key |
+| `ELEVENLABS_API_KEY` | Your ElevenLabs API key |
+| `ELEVENLABS_VOICE_ID` | Optional voice ID (default Rachel) |
 
 ### Step 4: Get Deploy Hook for GitHub Actions
 1. Go to Render Dashboard > Service > Settings
@@ -192,6 +195,7 @@ CREATE TABLE user_preferences (
   user_id UUID REFERENCES auth.users(id) PRIMARY KEY,
   preferred_genre TEXT DEFAULT 'indie',
   preferred_mood TEXT DEFAULT 'uplifting',
+  interests JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
