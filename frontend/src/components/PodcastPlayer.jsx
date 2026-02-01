@@ -28,7 +28,6 @@ export function PodcastPlayer({ audioUrl, className = '' }) {
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [ready, setReady] = useState(false)
   const [contextReady, setContextReady] = useState(false)
 
   const initAudioContext = useCallback(() => {
@@ -58,10 +57,7 @@ export function PodcastPlayer({ audioUrl, className = '' }) {
     const audio = audioRef.current
     if (!audio || !audioUrl) return
 
-    const onLoadedMetadata = () => {
-      setDuration(audio.duration)
-      setReady(true)
-    }
+    const onLoadedMetadata = () => setDuration(audio.duration)
     const onTimeUpdate = () => setCurrentTime(audio.currentTime)
     const onEnded = () => {
       setPlaying(false)
@@ -89,7 +85,6 @@ export function PodcastPlayer({ audioUrl, className = '' }) {
     const audio = audioRef.current
     if (audio) {
       audio.src = audioUrl
-      setReady(false)
       setDuration(0)
       setCurrentTime(0)
     }

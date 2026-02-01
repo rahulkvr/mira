@@ -10,13 +10,6 @@ const BAR_COUNT = 72
 const LERP = 0.38
 const CANVAS_SIZE = 320
 
-function formatTime(seconds) {
-  if (seconds == null || Number.isNaN(seconds)) return '0:00'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
-}
-
 const HVV_LINE_COLORS = {
   U1: { bg: '#0072bc', fg: '#fff' },
   U2: { bg: '#ed1c24', fg: '#fff' },
@@ -98,7 +91,6 @@ function useJourneyProgressFromSchedule(scheduleElements, audioCurrentTime, audi
   return useMemo(() => {
     if (!Array.isArray(scheduleElements) || scheduleElements.length === 0) {
       const progress = audioDuration > 0 ? Math.min(1, audioCurrentTime / audioDuration) : 0
-      const numSegments = 1
       return {
         progress,
         currentSegmentIndex: 0,
@@ -110,10 +102,10 @@ function useJourneyProgressFromSchedule(scheduleElements, audioCurrentTime, audi
     const lastArr = parseGeofoxTime(scheduleElements[scheduleElements.length - 1]?.to?.arrTime)
     if (!firstDep || !lastArr || lastArr <= firstDep) {
       const progress = audioDuration > 0 ? Math.min(1, audioCurrentTime / audioDuration) : 0
-      const numSegments = Math.max(1, scheduleElements.length)
+      const _numSegments = Math.max(1, scheduleElements.length)
       return {
         progress,
-        currentSegmentIndex: Math.min(Math.floor(progress * numSegments), numSegments - 1),
+        currentSegmentIndex: Math.min(Math.floor(progress * _numSegments), _numSegments - 1),
         useRealTime: false,
       }
     }
@@ -201,13 +193,14 @@ export function PodcastPlayerPage({
   )
   const delayAnnouncements = announcements.filter((a) => mentionsDelay(getAnnouncementLabel(a)))
   const hasDelays = delayAnnouncements.length > 0
+  const routeStationsKey = routeStations.join(',')
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
       setAnnouncementsLoading(true)
       try {
         const params = new URLSearchParams()
-        if (routeStations.length > 0) params.set('stations', routeStations.join(','))
+        if (routeStations.length > 0) params.set('stations', routeStationsKey)
         const url = `${apiBaseNorm}/api/announcements${params.toString() ? `?${params.toString()}` : ''}`.replace(/\/+/g, '/')
         const res = await fetch(url)
         const data = await res.json()
@@ -225,7 +218,7 @@ export function PodcastPlayerPage({
     fetchAnnouncements()
     const interval = setInterval(fetchAnnouncements, ANNOUNCEMENTS_POLL_MS)
     return () => clearInterval(interval)
-  }, [apiBaseNorm, routeStations.join(',')])
+  }, [apiBaseNorm, routeStationsKey, routeStations])
 
   const togglePlayPause = useCallback(() => {
     const audio = audioRef.current

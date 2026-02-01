@@ -130,9 +130,9 @@ export function PodcastScreen({
   durationMinutes,
   interests,
   routeSummary,
-  offlineReady,
-  script,
-  routeStations = [],
+  offlineReady: _offlineReady,
+  script: _script,
+  routeStations: _routeStations = [],
   apiBase = '',
   scheduleElements = [],
 }) {
@@ -143,6 +143,7 @@ export function PodcastScreen({
   const [newInterestInput, setNewInterestInput] = useState('')
 
   const interestList = useMemo(() => (interests || []).slice(0, MAX_INTERESTS), [interests])
+  const interestListKey = useMemo(() => interestList.join(','), [interestList])
 
   const apiBaseNorm = (() => {
     const raw = (apiBase || '').trim().replace(/\/+$/, '')
@@ -171,7 +172,7 @@ export function PodcastScreen({
       })
       .catch(() => setInterestSuggestions(FALLBACK_INTEREST_SUGGESTIONS))
       .finally(() => setInterestSuggestionsLoading(false))
-  }, [apiBaseNorm, interestList.join(',')])
+  }, [apiBaseNorm, interestListKey, interestList])
 
   useEffect(() => {
     if (!routeSummary) return
@@ -193,7 +194,7 @@ export function PodcastScreen({
       })
       .catch(() => setTopicSuggestions([]))
       .finally(() => setTopicSuggestionsLoading(false))
-  }, [apiBaseNorm, routeSummary, durationMinutes, interestList.join(',')])
+  }, [apiBaseNorm, routeSummary, durationMinutes, interestListKey, interestList])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] relative">
