@@ -79,7 +79,7 @@ function selectedLabel(selected) {
   return selected ? (selected.combinedName || (selected.city ? `${selected.name}, ${selected.city}` : selected.name)) : ''
 }
 
-function StationInput({ id, placeholder, value, selected, onChange, onSelect, disabled, dark, variant }) {
+function StationInput({ id, placeholder, value, selected, onChange, onSelect, disabled, dark, variant, closeDropdownTrigger, trailingElement }) {
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -87,6 +87,14 @@ function StationInput({ id, placeholder, value, selected, onChange, onSelect, di
   const wrapperRef = useRef(null)
   const selectedRef = useRef(selected)
   const displayValue = value ?? selectedLabel(selected)
+
+  const skipNextOpenRef = useRef(false)
+  useEffect(() => {
+    if (closeDropdownTrigger != null && closeDropdownTrigger > 0) {
+      setOpen(false)
+      skipNextOpenRef.current = true
+    }
+  }, [closeDropdownTrigger])
   
   useEffect(() => {
     selectedRef.current = selected
@@ -111,7 +119,11 @@ function StationInput({ id, placeholder, value, selected, onChange, onSelect, di
         .then((r) => r.json())
         .then((data) => {
           setSuggestions(data.results || [])
-          if (!selectedRef.current) setOpen(true)
+          if (skipNextOpenRef.current) {
+            skipNextOpenRef.current = false
+          } else if (!selectedRef.current) {
+            setOpen(true)
+          }
         })
         .catch(() => setSuggestions([]))
         .finally(() => setLoading(false))
@@ -134,14 +146,20 @@ function StationInput({ id, placeholder, value, selected, onChange, onSelect, di
   const darkPlaceholder = isDestinationPill ? 'placeholder-[#6B6B6B]' : 'placeholder-[#6B6B6B]'
   const darkText = isDestinationPill ? 'text-[#1A1A1A]' : 'text-white'
   const pillClass = dark
-    ? `w-full rounded-full ${darkBg} py-4 pl-6 pr-4 text-left font-bold ${darkText} ${darkPlaceholder} focus:outline-none`
-    : 'w-full rounded-full bg-white border-2 border-[#E8E3DD] py-4 pl-6 pr-4 text-left font-bold text-[#1A1A1A] placeholder:text-[#6B6B6B] shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus:outline-none focus:border-[#1A1A1A]'
+    ? `w-full rounded-full ${darkBg} py-4 pl-10 pr-4 text-left font-bold ${darkText} ${darkPlaceholder} focus:outline-none`
+    : 'w-full rounded-full bg-white border-2 border-[#E8E3DD] py-4 pl-10 pr-4 text-left font-bold text-[#1A1A1A] placeholder:text-[#6B6B6B] shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus:outline-none focus:border-[#1A1A1A]'
+  const pillWrapperClass = dark
+    ? `relative flex w-full items-center rounded-full ${darkBg} py-4 pl-0 pr-3 text-left ${darkText}`
+    : 'relative flex w-full items-center rounded-full bg-white border-2 border-[#E8E3DD] py-4 pl-0 pr-3 text-left shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus-within:border-[#1A1A1A]'
+  const inputInnerClass = dark
+    ? `flex-1 min-w-0 bg-transparent font-bold ${darkText} ${darkPlaceholder} focus:outline-none`
+    : 'flex-1 min-w-0 bg-transparent font-bold text-[#1A1A1A] placeholder:text-[#6B6B6B] focus:outline-none'
   const dotClass = isDestinationPill ? 'bg-[#6B6B6B]' : (dark ? 'bg-white' : 'bg-[#6B6B6B]')
 
   return (
     <div ref={wrapperRef} className="relative">
-      <div className="relative flex items-center">
-        <span className={`absolute left-5 h-2 w-2 shrink-0 rounded-full ${dotClass}`} aria-hidden />
+      <div className={trailingElement ? pillWrapperClass : 'relative flex items-center'}>
+        <span className={`absolute left-6 top-1/2 -translate-y-1/2 h-2 w-2 shrink-0 rounded-full ${dotClass}`} aria-hidden />
         <input
           id={id}
           type="text"
@@ -151,8 +169,9 @@ function StationInput({ id, placeholder, value, selected, onChange, onSelect, di
           placeholder={placeholder}
           disabled={disabled}
           autoComplete="off"
-          className={`${pillClass} pl-8`}
+          className={trailingElement ? `pl-10 ${inputInnerClass}` : `${pillClass} pl-10`}
         />
+        {trailingElement && <span className="shrink-0 pl-1">{trailingElement}</span>}
       </div>
       {loading && (
         <span className={`absolute right-5 top-1/2 -translate-y-1/2 text-xs ${isDestinationPill ? 'text-[#6B6B6B]' : 'text-[#6B6B6B]'}`}>
@@ -330,6 +349,23 @@ export default function App() {
   const [podcastOfflineReady, setPodcastOfflineReady] = useState(false)
   const [savedPlaces, setSavedPlaces] = useState(loadLocalSavedPlaces)
   const [inputsDirty, setInputsDirty] = useState(false)
+  const [closeEndDropdownTick, setCloseEndDropdownTick] = useState(0)
+  const departArrivePillRef = useRef(null)
+  const dateTimeGridRef = useRef(null)
+
+  useEffect(() => {
+    if (activeTab !== 'ride' || !departArrivePillRef.current || !dateTimeGridRef.current) return
+    const measure = () => {
+      const pill = departArrivePillRef.current?.getBoundingClientRect()
+      const grid = dateTimeGridRef.current?.getBoundingClientRect()
+      if (!pill || !grid) return
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/85ddee38-ce18-4101-9671-72cf609e0fe3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'App.jsx:When pills', message: 'Depart/Arrive pill vs date/time grid bounds', data: { departArrive: { left: pill.left, right: pill.right, width: pill.width }, dateTimeGrid: { left: grid.left, right: grid.right, width: grid.width }, overflow: grid.width > pill.width || grid.right > pill.right || grid.left < pill.left }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {})
+      // #endregion
+    }
+    const t = setTimeout(measure, 100)
+    return () => clearTimeout(t)
+  }, [activeTab])
 
   useEffect(() => {
     if (authLoading) return
@@ -814,31 +850,35 @@ export default function App() {
 
   const displayName = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || ''
 
+  const isMainScreen = activeTab === 'ride' || activeTab === 'explore' || activeTab === 'profile'
   return (
-    <div className="min-h-screen bg-background-light font-display">
-      {activeTab !== 'ride' && (
-        <AppHeader onProfileClick={() => setActiveTab('profile')} userName={displayName} />
-      )}
+    <div className={`min-h-screen font-display ${isMainScreen ? 'bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFFDF9]' : 'bg-background-light'}`}>
+      <AppHeader onProfileClick={() => setActiveTab('profile')} userName={displayName} />
       <div className="pb-24">
         {activeTab === 'ride' && (
-          <div className="min-h-screen bg-background-light">
-            <main className="w-full max-w-md mx-auto px-6 pb-40 pt-[3.75rem]">
-              <form onSubmit={handleSubmit} className="flex flex-col">
-                {/* Step 1: Where to? */}
-                <div className="border-l-2 border-gray-100 ml-5 pl-10 pb-10 relative">
-                  <div className="absolute -left-[21px] top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 bg-pinky text-gray-900" aria-hidden>
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
-                  </div>
-                  <section className="mb-5">
-                    <h1 className="text-4xl font-bold tracking-tight text-gray-900 mb-2 leading-tight">Where are you going?</h1>
-                  </section>
-                  <div className="bg-white rounded-2xl p-2 shadow-ios ring-1 ring-gray-100">
-                    <label htmlFor="end" className="sr-only">To</label>
-                    <div className="relative flex items-center gap-1">
-                      <div className="flex-1 min-w-0">
-                        <StationInput
-                          id="end"
-                          placeholder="Where to?"
+          <div className="min-h-screen px-5 pb-6 relative overflow-hidden">
+            <div className="absolute top-20 -right-20 w-64 h-64 rounded-full bg-gradient-to-br from-[#FFB5C5]/30 to-[#FF9AAD]/20 blur-3xl pointer-events-none" aria-hidden />
+            <div className="absolute bottom-60 -left-20 w-48 h-48 rounded-full bg-gradient-to-br from-[#B5E8D4]/25 to-[#9BC4DC]/15 blur-3xl pointer-events-none" aria-hidden />
+            <main className="w-full pb-40 relative z-10">
+              <header className="mb-8">
+                <h1 className="text-3xl font-bold text-[#1F1F1F] tracking-tight">
+                  Plan your trip
+                </h1>
+                <p className="text-gray-500 mt-1">
+                  Find the best route for your commute
+                </p>
+              </header>
+
+              <form onSubmit={handleSubmit} className="space-y-6 min-w-0">
+                <div className="rounded-2xl bg-white shadow-ios border border-gray-100 p-4 space-y-3">
+                  <div>
+                    <label htmlFor="end" className="text-sm font-semibold text-gray-500 mb-2 block">
+                      Where to?
+                    </label>
+                    <div>
+                      <StationInput
+                        id="end"
+                        placeholder="Search destination"
                         value={endQuery}
                         selected={endSelected}
                         onSelect={(r) => {
@@ -849,215 +889,197 @@ export default function App() {
                         onChange={(v) => { setEndQuery(v); setEndSelected(null); if (schedules.length > 0) setInputsDirty(true) }}
                         disabled={loading}
                         dark={false}
+                        closeDropdownTrigger={closeEndDropdownTick}
                       />
-                      </div>
-                      <span className="p-2 text-gray-400 pointer-events-none shrink-0" aria-hidden>
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-                      </span>
                     </div>
                   </div>
-                </div>
 
-                {/* Step 2: Quick selections */}
-                <div className="border-l-2 border-gray-100 ml-5 pl-10 pb-10 relative">
-                  <div className="absolute -left-[21px] top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 bg-accent text-gray-900" aria-hidden>
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Quick selections</p>
-                    <div className="flex flex-wrap gap-2">
-                      {(savedPlaces.length > 0 ? savedPlaces.map((p) => ({ id: p.id, label: p.label || p.address, address: p.address })) : [{ id: 'hbf', label: 'Hamburg Hbf' }, { id: 'jungfernstieg', label: 'Jungfernstieg' }, { id: 'altona', label: 'Altona' }, { id: 'harburg', label: 'Harburg' }]).map((place) => (
-                        <button
-                          key={place.id}
-                          type="button"
-                          onClick={() => {
-                            const value = place.address || place.label
-                            setEndQuery(value)
-                            setEndSelected(null)
-                            if (schedules.length > 0) setInputsDirty(true)
-                          }}
-                          className="px-3 py-1.5 bg-accent/20 border border-accent/30 text-[11px] font-bold rounded-full text-yellow-800 uppercase tracking-wider hover:shadow-md transition-all cursor-pointer"
-                        >
-                          {place.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 3: Starting from */}
-                <div className="border-l-2 border-gray-100 ml-5 pl-10 pb-10 relative">
-                  <div className="absolute -left-[21px] top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 bg-mint text-gray-900" aria-hidden>
-                    <span className="w-2.5 h-2.5 rounded-full bg-gray-800" />
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <label className="text-sm font-bold text-gray-400 uppercase tracking-widest block">Starting from</label>
-                    <div className="bg-white rounded-2xl p-2 shadow-ios ring-1 ring-gray-100">
-                      <div className="relative flex items-center flex-wrap gap-2">
-                        <div className="flex-1 min-w-0">
-                          <StationInput
-                            id="start"
-                            placeholder="Current location"
-                            value={startQuery}
-                            selected={startSelected}
-                            onSelect={(r) => {
-                              setStartSelected(r)
-                              if (r) setStartQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
+                  {savedPlaces.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {savedPlaces.map((p) => {
+                        const place = { id: p.id, label: p.label || p.address, address: p.address }
+                        return (
+                          <button
+                            key={place.id}
+                            type="button"
+                            onClick={() => {
+                              const value = place.address || place.label
+                              setEndQuery(value)
+                              setEndSelected(null)
+                              setCloseEndDropdownTick((t) => t + 1)
                               if (schedules.length > 0) setInputsDirty(true)
                             }}
-                            onChange={(v) => { setStartQuery(v); setStartSelected(null); if (schedules.length > 0) setInputsDirty(true) }}
-                            disabled={loading}
-                            dark={false}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleUseLiveLocation}
-                          className="p-2 rounded-full text-blue-500 hover:bg-blue-50 shrink-0 transition-colors"
-                          aria-label="Use live location"
-                        >
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <circle cx="12" cy="12" r="3" />
-                            <path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
-                          </svg>
-                        </button>
-                      </div>
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200 text-[#1F1F1F] shadow-[0_1px_3px_rgba(0,0,0,0.04)] active:opacity-80 transition-opacity active:bg-gray-50"
+                          >
+                            <svg className="w-3 h-3 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                            <span className="truncate max-w-[120px]">{place.label}</span>
+                          </button>
+                        )
+                      })}
                     </div>
+                  )}
+
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="flex-1 h-px bg-gray-200" />
                     <button
                       type="button"
                       onClick={swapStartEnd}
                       disabled={loading}
-                      className="self-start p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-                      title="Swap start and destination"
-                      aria-label="Swap start and destination"
+                      className="p-2 rounded-full bg-gray-100 text-gray-500 active:bg-accent/20 active:text-[#1F1F1F] transition-colors"
+                      aria-label="Swap origin and destination"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                     </button>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+
+                  <div>
+                    <label htmlFor="start" className="text-sm font-semibold text-gray-500 mb-2 block">
+                      From
+                    </label>
+                    <div>
+                      <StationInput
+                        id="start"
+                        placeholder="Current location"
+                        value={startQuery}
+                        selected={startSelected}
+                        onSelect={(r) => {
+                          setStartSelected(r)
+                          if (r) setStartQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
+                          if (schedules.length > 0) setInputsDirty(true)
+                        }}
+                        onChange={(v) => { setStartQuery(v); setStartSelected(null); if (schedules.length > 0) setInputsDirty(true) }}
+                        disabled={loading}
+                        dark={false}
+                        trailingElement={
+                          <button
+                            type="button"
+                            onClick={handleUseLiveLocation}
+                            className="p-1.5 rounded-full text-blue-500 active:bg-blue-50 transition-colors"
+                            aria-label="Use live location"
+                          >
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                          </button>
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Step 4: Schedule */}
-                <div className="border-l-2 border-gray-100 ml-5 pl-10 pb-6 relative last:border-l-0">
-                  <div className="absolute -left-[21px] top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 bg-primary text-white" aria-hidden>
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <label className="text-sm font-bold text-gray-400 uppercase tracking-widest block">Schedule</label>
-                      <div className="bg-white p-1 rounded-full shadow-ios flex scale-90 origin-right shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => { setTimeIsDeparture(true); if (schedules.length > 0) setInputsDirty(true) }}
-                          disabled={loading}
-                          className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${timeIsDeparture ? 'bg-primary text-white' : 'bg-transparent text-gray-400'}`}
-                        >
-                          Departure
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setTimeIsDeparture(false); if (schedules.length > 0) setInputsDirty(true) }}
-                          disabled={loading}
-                          className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${!timeIsDeparture ? 'bg-primary text-white' : 'bg-transparent text-gray-400'}`}
-                        >
-                          Arrival
-                        </button>
-                      </div>
+                <div className="rounded-2xl bg-white shadow-ios border border-gray-100 p-4 overflow-hidden min-w-0">
+                  <label className="text-sm font-semibold text-gray-500 mb-3 block">When</label>
+                  <div className="space-y-3 min-w-0">
+                    <div ref={departArrivePillRef} className="flex p-1 rounded-full bg-gray-100 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => { setTimeIsDeparture(true); if (schedules.length > 0) setInputsDirty(true) }}
+                        disabled={loading}
+                        className={`flex-1 min-w-0 py-2 rounded-full text-sm font-semibold transition-all truncate ${timeIsDeparture ? 'bg-[#1F1F1F] text-white' : 'bg-transparent text-gray-500'}`}
+                      >
+                        Depart at
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setTimeIsDeparture(false); if (schedules.length > 0) setInputsDirty(true) }}
+                        disabled={loading}
+                        className={`flex-1 min-w-0 py-2 rounded-full text-sm font-semibold transition-all truncate ${!timeIsDeparture ? 'bg-[#1F1F1F] text-white' : 'bg-transparent text-gray-500'}`}
+                      >
+                        Arrive by
+                      </button>
                     </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="bg-white p-2 rounded-2xl shadow-ios ring-1 ring-gray-100 flex items-center px-4 relative">
+                    <div ref={dateTimeGridRef} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 min-w-0 w-full max-w-full pl-2 pr-2">
+                      <div className="relative min-w-0 w-full max-w-full">
+                        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                         <input
                           type="date"
                           value={date}
                           onChange={(e) => { setDate(e.target.value); if (schedules.length > 0) setInputsDirty(true) }}
                           disabled={loading}
-                          className="w-full bg-transparent border-none py-3 text-sm font-bold text-gray-900 focus:ring-0 outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                          className="w-full min-w-0 max-w-full box-border rounded-xl border-2 border-[#E8E3DD] bg-white py-3 pl-11 pr-3 text-sm font-medium text-[#1F1F1F] shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus:outline-none focus:border-[#1F1F1F] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                          style={{ minWidth: 0 }}
                         />
-                        <span className="text-gray-400 pointer-events-none ml-2" aria-hidden>
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                        </span>
                       </div>
-                      <div className="bg-white p-2 rounded-2xl shadow-ios ring-1 ring-gray-100 flex items-center px-4 relative">
+                      <div className="relative min-w-0 w-full max-w-full">
+                        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                         <input
                           type="time"
                           value={time}
                           onChange={(e) => { setTime(e.target.value); if (schedules.length > 0) setInputsDirty(true) }}
                           disabled={loading}
-                          className="w-full bg-transparent border-none py-3 text-sm font-bold text-gray-900 focus:ring-0 outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                          className="w-full min-w-0 max-w-full box-border rounded-xl border-2 border-[#E8E3DD] bg-white py-3 pl-11 pr-3 text-sm font-medium text-[#1F1F1F] shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus:outline-none focus:border-[#1F1F1F] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                          style={{ minWidth: 0 }}
                         />
-                        <span className="text-gray-400 pointer-events-none ml-2" aria-hidden>
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-6">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className={`w-full py-6 rounded-3xl font-black text-xl uppercase tracking-widest transition-transform shadow-2xl shadow-black/20 active:scale-[0.98] ${loading ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-primary text-white'}`}
-                  >
-                    {loading ? 'Searching…' : 'Find routes'}
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full py-4 rounded-2xl font-semibold text-base flex items-center justify-center gap-2 transition-transform active:scale-[0.98] ${loading ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#1F1F1F] text-white shadow-lg'}`}
+                >
+                  {loading ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                      <span>Searching...</span>
+                    </>
+                  ) : (
+                    <span>Find routes</span>
+                  )}
+                </button>
               </form>
 
-                {error && (
-                  <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
-                  </div>
-                )}
+              {error && (
+                <div className="mt-6 flex items-start gap-3 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700">
+                  <svg className="w-5 h-5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                  <p className="text-sm">{error}</p>
+                </div>
+              )}
 
-                {/* Loading skeleton — Commute Companion style */}
-                {loading && (
-                  <section className="space-y-4 pb-24">
-                    <div className="flex items-center justify-between">
-                      <div className="h-5 w-32 bg-gray-200 rounded-lg animate-pulse" />
-                      <div className="h-4 w-16 bg-gray-200 rounded-lg animate-pulse" />
-                    </div>
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="rounded-3xl bg-white shadow-lg border border-gray-50 p-5">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-7 w-20 bg-gray-200 rounded-lg animate-pulse" />
-                            <div className="h-4 w-24 bg-gray-200 rounded-lg animate-pulse" />
-                          </div>
-                          <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse" />
+              {inputsDirty && schedules.length > 0 && !loading && (
+                <div className="mt-6 flex items-center gap-3 p-4 rounded-2xl bg-[#FFF5D6] border border-[#FFE9A8]">
+                  <svg className="w-5 h-5 text-[#1F1F1F] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                  <p className="text-sm text-[#1F1F1F]">Inputs changed — search again to update routes</p>
+                </div>
+              )}
+
+              {loading && (
+                <section className="mt-8 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="h-5 w-32 bg-gray-200 rounded-lg animate-pulse" />
+                    <div className="h-4 w-16 bg-gray-200 rounded-lg animate-pulse" />
+                  </div>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="rounded-2xl bg-white border border-gray-100 p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-7 w-20 bg-gray-200 rounded-lg animate-pulse" />
+                          <div className="h-4 w-24 bg-gray-200 rounded-lg animate-pulse" />
                         </div>
-                        <div className="space-y-3">
-                          {[1, 2, 3].map((j) => (
-                            <div key={j} className="flex items-center gap-3">
-                              <div className="h-8 w-14 bg-gray-200 rounded-lg animate-pulse" />
-                              <div className="h-4 flex-1 bg-gray-200 rounded-lg animate-pulse" />
-                              <div className="h-4 w-8 bg-gray-200 rounded-lg animate-pulse" />
-                            </div>
-                          ))}
-                        </div>
+                        <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse" />
                       </div>
-                    ))}
-                  </section>
-                )}
-
-                {/* Inputs changed banner — Commute Companion style */}
-                {inputsDirty && schedules.length > 0 && (
-                  <div className="mb-4 flex items-center gap-3 p-3 rounded-2xl bg-[#FFF5D6] border border-[#FFE9A8]">
-                    <svg className="w-[18px] h-[18px] text-[#1F1F1F] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                    <span className="text-sm text-[#1F1F1F]">Inputs changed — search again to update routes</span>
-                  </div>
-                )}
-
-                {/* Route results — only when not dirty */}
-                {schedules.length > 0 && !loading && !inputsDirty && (
-                  <section className="space-y-4 pb-24">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-bold text-[#1F1F1F]">Available routes</h2>
-                      <span className="text-sm text-gray-500">{schedules.length} options</span>
+                      <div className="space-y-2.5">
+                        {[1, 2].map((j) => (
+                          <div key={j} className="flex items-center gap-3">
+                            <div className="h-7 w-12 bg-gray-200 rounded-lg animate-pulse" />
+                            <div className="h-4 flex-1 bg-gray-200 rounded-lg animate-pulse" />
+                            <div className="h-4 w-16 bg-gray-200 rounded-lg animate-pulse" />
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  ))}
+                </section>
+              )}
+
+              {!loading && !inputsDirty && schedules.length > 0 && (
+                <section className="mt-8 space-y-4 pb-24">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-[#1F1F1F]">Available routes</h2>
+                    <span className="text-sm text-gray-500">{schedules.length} options</span>
+                  </div>
+                  <div className="space-y-3">
                     {schedules.map((schedule, i) => (
                       <RouteOption
                         key={schedule.routeId ?? i}
@@ -1066,8 +1088,9 @@ export default function App() {
                         onSelect={handleSelectRoute}
                       />
                     ))}
-                  </section>
-                )}
+                  </div>
+                </section>
+              )}
             </main>
             </div>
         )}

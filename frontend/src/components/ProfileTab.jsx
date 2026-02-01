@@ -27,10 +27,10 @@ export function ProfileTab() {
   }
 
   return (
-    <div className="min-h-screen px-5 pt-4 pb-6 bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFFDF9] relative overflow-hidden">
+    <div className="min-h-screen px-5 pb-6 bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFFDF9] relative overflow-hidden">
       <div className="absolute top-0 right-0 w-72 h-72 rounded-full bg-gradient-to-br from-[#E0F5ED]/40 to-[#B8E8D4]/30 blur-3xl pointer-events-none" aria-hidden />
 
-      <div className="relative z-10 flex items-center gap-4 mb-6">
+      <div className="relative z-10 flex items-center gap-4 mb-8">
         <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-[#FFE9A8] to-[#FFD56B] flex items-center justify-center shadow-lg shrink-0">
           <UserIcon className="w-7 h-7 text-[#1F1F1F]" />
         </div>

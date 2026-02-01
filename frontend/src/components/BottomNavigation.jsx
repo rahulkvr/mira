@@ -1,5 +1,5 @@
 /**
- * Bottom tab bar — Ride, Explore, Profile (matches Commute Companion).
+ * Bottom tab bar — Ride, Explore.
  */
 function TransitIcon({ className }) {
   return (
@@ -18,19 +18,9 @@ function CompassIcon({ className }) {
   )
 }
 
-function UserIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  )
-}
-
 const TABS = [
   { id: 'ride', label: 'Ride', Icon: TransitIcon },
   { id: 'explore', label: 'Explore', Icon: CompassIcon },
-  { id: 'profile', label: 'Profile', Icon: UserIcon },
 ]
 
 export function BottomNavigation({ activeTab, onTabChange }) {
