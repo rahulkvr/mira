@@ -19,6 +19,26 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 // Set to true to always show welcome on load (for editing). Set to false and use key below to show once.
 const ALWAYS_SHOW_WELCOME = true
 const WELCOME_DONE_KEY = 'mira_welcome_done'
+const INTERESTS_LOCAL_KEY = 'mira_interests'
+const SAVED_PLACES_KEY = 'mira_saved_places'
+
+function loadLocalInterests() {
+  try {
+    const raw = localStorage.getItem(INTERESTS_LOCAL_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function loadLocalSavedPlaces() {
+  try {
+    const raw = localStorage.getItem(SAVED_PLACES_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
 const STATIONS_DEBOUNCE_MS = 300
 const DEFAULT_PODCAST_MIN = 6
 
@@ -196,18 +216,24 @@ function getLineStyle(line) {
   return { ...FALLBACK_COLOR, label }
 }
 
-function RouteOption({ schedule, onSelect }) {
+function RouteOption({ schedule, index, onSelect }) {
   const elements = schedule.scheduleElements || []
   const totalMin = schedule.time
   const walkMin = schedule.footpathTime || 0
   const ticket = schedule.tickets?.[0]
 
   return (
-    <article className="rounded-3xl bg-white shadow-lg border border-gray-50 p-5 transition-all hover:shadow-xl active:scale-[0.99]">
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect?.(schedule)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(schedule) } }}
+      className="rounded-3xl bg-white shadow-lg border border-gray-50 p-5 transition-all hover:shadow-xl active:scale-[0.99] cursor-pointer text-left"
+    >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
@@ -217,6 +243,9 @@ function RouteOption({ schedule, onSelect }) {
             <span className="text-sm text-gray-500 border-l border-gray-200 pl-3">{walkMin} min walk</span>
           )}
         </div>
+        <svg className="w-5 h-5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
       </div>
       <div className="space-y-3">
         {elements.map((el, i) => {
@@ -249,15 +278,6 @@ function RouteOption({ schedule, onSelect }) {
             {ticket.price != null ? `€${ticket.price}` : ''}
           </span>
         </div>
-      )}
-      {onSelect && (
-        <button
-          type="button"
-          onClick={() => onSelect(schedule)}
-          className="mt-4 w-full h-11 rounded-2xl text-sm font-semibold bg-[#1F1F1F] text-white shadow hover:bg-[#2A2A2A] transition-colors"
-        >
-          Create podcast
-        </button>
       )}
     </article>
   )
@@ -295,7 +315,7 @@ export default function App() {
   const [schedules, setSchedules] = useState([])
   const [activeTab, setActiveTab] = useState('ride')
   const [selectedSchedule, setSelectedSchedule] = useState(null)
-  const [userInterests, setUserInterests] = useState([])
+  const [userInterests, setUserInterests] = useState(loadLocalInterests)
   const [interestsLoading, setInterestsLoading] = useState(false)
   const [podcastTopic, setPodcastTopic] = useState('')
   const [podcastScript, setPodcastScript] = useState('')
@@ -303,6 +323,8 @@ export default function App() {
   const [podcastError, setPodcastError] = useState('')
   const [podcastLoading, setPodcastLoading] = useState(false)
   const [podcastOfflineReady, setPodcastOfflineReady] = useState(false)
+  const [savedPlaces, setSavedPlaces] = useState(loadLocalSavedPlaces)
+  const [inputsDirty, setInputsDirty] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -312,9 +334,8 @@ export default function App() {
       }
       return
     }
-    if (currentScreen === 'main') {
-      setCurrentScreen('welcome')
-    }
+    // Do not redirect guests from main to welcome: they may have completed onboarding
+    // (e.g. skipped email) and clicked "Start planning a ride"; allow them to stay on main.
   }, [authLoading, user, currentScreen])
 
   useEffect(() => {
@@ -379,7 +400,13 @@ export default function App() {
     setCurrentScreen('city')
   }
 
-  const handlePlacesContinue = (_places) => {
+  const handlePlacesContinue = (places) => {
+    setSavedPlaces(places || [])
+    try {
+      localStorage.setItem(SAVED_PLACES_KEY, JSON.stringify(places || []))
+    } catch {
+      // ignore
+    }
     setCurrentScreen('email')
   }
 
@@ -436,30 +463,34 @@ export default function App() {
 
   const handleInterestsComplete = async (_interests) => {
     setInterestsError('')
-    if (!user) {
-      setInterestsError('Please sign in to save your interests.')
+    const canSaveToSupabase = user && hasSupabaseConfig && supabase
+    if (canSaveToSupabase) {
+      setInterestsSaving(true)
+      const { error: upsertError } = await supabase
+        .from('user_preferences')
+        .upsert(
+          {
+            user_id: user.id,
+            interests: _interests,
+          },
+          { onConflict: 'user_id' }
+        )
+      setInterestsSaving(false)
+      if (upsertError) {
+        setInterestsError(upsertError.message || 'Could not save interests. Please try again.')
+        return
+      }
+      setCurrentScreen('success')
       return
     }
-    if (!hasSupabaseConfig || !supabase) {
-      setInterestsError('Supabase is not configured.')
-      return
+    // No user or Supabase not configured: save locally and proceed
+    try {
+      localStorage.setItem(INTERESTS_LOCAL_KEY, JSON.stringify(_interests))
+      setUserInterests(_interests)
+      setCurrentScreen('success')
+    } catch {
+      setInterestsError('Could not save interests on this device.')
     }
-    setInterestsSaving(true)
-    const { error: upsertError } = await supabase
-      .from('user_preferences')
-      .upsert(
-        {
-          user_id: user.id,
-          interests: _interests,
-        },
-        { onConflict: 'user_id' }
-      )
-    setInterestsSaving(false)
-    if (upsertError) {
-      setInterestsError(upsertError.message || 'Could not save interests. Please try again.')
-      return
-    }
-    setCurrentScreen('success')
   }
 
   const handleSuccessStartRide = () => {
@@ -569,10 +600,18 @@ export default function App() {
     setEndSelected(startSelected)
   }
 
+  function handleUseLiveLocation() {
+    setStartQuery('Current location')
+    setStartSelected(null)
+    if (schedules.length > 0) setInputsDirty(true)
+    // Optional: could call geolocation + reverse geocode to a station here
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
     setSchedules([])
+    setInputsDirty(false)
     if (!hasStart || !hasEnd) {
       setError('Please enter and select both start and end.')
       return
@@ -679,160 +718,192 @@ export default function App() {
   const displayName = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || ''
 
   return (
-    <div className="min-h-screen bg-[#FFF8F0]">
-      <AppHeader onProfileClick={() => setActiveTab('profile')} userName={displayName} />
+    <div className="min-h-screen bg-background-light font-display">
+      {activeTab !== 'ride' && (
+        <AppHeader onProfileClick={() => setActiveTab('profile')} userName={displayName} />
+      )}
       <div className="pb-24">
         {activeTab === 'ride' && (
-          <div className="min-h-screen bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFFDF9] relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-72 h-72 rounded-full bg-gradient-to-br from-[#FFE9A8]/30 to-[#FFCF6B]/20 blur-3xl pointer-events-none" aria-hidden />
-            <div className="absolute top-40 -left-20 w-48 h-48 rounded-full bg-gradient-to-br from-[#B5E8D4]/25 to-[#9BC4DC]/15 blur-3xl pointer-events-none" aria-hidden />
-
-            <div className="px-5 pt-4 pb-6 relative z-10">
-              <header className="mb-6">
-                <h1 className="text-2xl font-bold text-[#1F1F1F]">Where are you going?</h1>
-              </header>
-
-              {/* Departure/Arrival toggle — Commute Companion style */}
-              <div className="mb-5">
-                <div className="inline-flex bg-white rounded-full p-1 shadow-sm border border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => setTimeIsDeparture(true)}
-                    disabled={loading}
-                    className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${timeIsDeparture ? 'bg-[#1F1F1F] text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                    Departure
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTimeIsDeparture(false)}
-                    disabled={loading}
-                    className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${!timeIsDeparture ? 'bg-[#1F1F1F] text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                    Arrival
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-0">
-                {/* Route input card — Commute Companion style */}
-                <div className="rounded-3xl bg-white shadow-lg border border-gray-50 p-5 space-y-4 mb-5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#E0F5ED] to-[#B8E8D4] flex items-center justify-center shrink-0">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#1F1F1F]" aria-hidden />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-0.5">From</p>
-                      <StationInput
-                        id="start"
-                        placeholder="Current location"
-                        value={startQuery}
-                        selected={startSelected}
-                        onSelect={(r) => {
-                          setStartSelected(r)
-                          if (r) setStartQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
-                        }}
-                        onChange={(v) => { setStartQuery(v); setStartSelected(null) }}
-                        disabled={loading}
-                        dark={false}
-                      />
-                    </div>
+          <div className="min-h-screen bg-background-light">
+            <main className="w-full max-w-md mx-auto px-6 pb-40 pt-[3.75rem]">
+              <form onSubmit={handleSubmit} className="flex flex-col">
+                {/* Step 1: Where to? */}
+                <div className="border-l-2 border-gray-100 ml-5 pl-10 pb-10 relative">
+                  <div className="absolute -left-[21px] top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 bg-pinky text-gray-900" aria-hidden>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
                   </div>
-
-                  <div className="flex items-center gap-4 py-1">
-                    <div className="w-10 flex justify-center shrink-0">
-                      <div className="flex flex-col gap-1">
-                        <span className="w-1 h-1 rounded-full bg-gray-300 block" />
-                        <span className="w-1 h-1 rounded-full bg-gray-300 block" />
-                        <span className="w-1 h-1 rounded-full bg-gray-300 block" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FFE4EC] to-[#FFCCD8] flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4 text-[#1F1F1F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                        <circle cx="12" cy="10" r="3" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-0.5">To</p>
-                      <StationInput
-                        id="end"
-                        placeholder="Where to?"
+                  <section className="mb-5">
+                    <h1 className="text-4xl font-bold tracking-tight text-gray-900 mb-2 leading-tight">Where are you going?</h1>
+                  </section>
+                  <div className="bg-white rounded-2xl p-2 shadow-ios ring-1 ring-gray-100">
+                    <label htmlFor="end" className="sr-only">To</label>
+                    <div className="relative flex items-center gap-1">
+                      <div className="flex-1 min-w-0">
+                        <StationInput
+                          id="end"
+                          placeholder="Where to?"
                         value={endQuery}
                         selected={endSelected}
                         onSelect={(r) => {
                           setEndSelected(r)
                           if (r) setEndQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
+                          if (schedules.length > 0) setInputsDirty(true)
                         }}
-                        onChange={(v) => { setEndQuery(v); setEndSelected(null) }}
+                        onChange={(v) => { setEndQuery(v); setEndSelected(null); if (schedules.length > 0) setInputsDirty(true) }}
                         disabled={loading}
-                        dark
-                        variant="destination"
+                        dark={false}
                       />
+                      </div>
+                      <span className="p-2 text-gray-400 pointer-events-none shrink-0" aria-hidden>
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 2: Quick selections */}
+                <div className="border-l-2 border-gray-100 ml-5 pl-10 pb-10 relative">
+                  <div className="absolute -left-[21px] top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 bg-accent text-gray-900" aria-hidden>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Quick selections</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(savedPlaces.length > 0 ? savedPlaces.map((p) => ({ id: p.id, label: p.label || p.address, address: p.address })) : [{ id: 'hbf', label: 'Hamburg Hbf' }, { id: 'jungfernstieg', label: 'Jungfernstieg' }, { id: 'altona', label: 'Altona' }, { id: 'harburg', label: 'Harburg' }]).map((place) => (
+                        <button
+                          key={place.id}
+                          type="button"
+                          onClick={() => {
+                            const value = place.address || place.label
+                            setEndQuery(value)
+                            setEndSelected(null)
+                            if (schedules.length > 0) setInputsDirty(true)
+                          }}
+                          className="px-3 py-1.5 bg-accent/20 border border-accent/30 text-[11px] font-bold rounded-full text-yellow-800 uppercase tracking-wider hover:shadow-md transition-all cursor-pointer"
+                        >
+                          {place.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3: Starting from */}
+                <div className="border-l-2 border-gray-100 ml-5 pl-10 pb-10 relative">
+                  <div className="absolute -left-[21px] top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 bg-mint text-gray-900" aria-hidden>
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-800" />
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <label className="text-sm font-bold text-gray-400 uppercase tracking-widest block">Starting from</label>
+                    <div className="bg-white rounded-2xl p-2 shadow-ios ring-1 ring-gray-100">
+                      <div className="relative flex items-center flex-wrap gap-2">
+                        <div className="flex-1 min-w-0">
+                          <StationInput
+                            id="start"
+                            placeholder="Current location"
+                            value={startQuery}
+                            selected={startSelected}
+                            onSelect={(r) => {
+                              setStartSelected(r)
+                              if (r) setStartQuery(r.combinedName || (r.city ? `${r.name}, ${r.city}` : r.name))
+                              if (schedules.length > 0) setInputsDirty(true)
+                            }}
+                            onChange={(v) => { setStartQuery(v); setStartSelected(null); if (schedules.length > 0) setInputsDirty(true) }}
+                            disabled={loading}
+                            dark={false}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleUseLiveLocation}
+                          className="p-2 rounded-full text-blue-500 hover:bg-blue-50 shrink-0 transition-colors"
+                          aria-label="Use live location"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={swapStartEnd}
                       disabled={loading}
-                      className="shrink-0 p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-[#1F1F1F] transition-colors"
+                      className="self-start p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
                       title="Swap start and destination"
                       aria-label="Swap start and destination"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                      </svg>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                     </button>
                   </div>
+                </div>
 
-                  {/* Quick place chips */}
-                  <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
-                    {['Hamburg Hbf', 'Jungfernstieg', 'Altona', 'Harburg'].map((label) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => {
-                          setEndQuery(label)
-                          setEndSelected(null)
-                        }}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-br from-[#FFF5D6] to-[#FFE9A8] text-[#6B5900] hover:shadow-md transition-all"
-                      >
-                        {label}
-                      </button>
-                    ))}
+                {/* Step 4: Schedule */}
+                <div className="border-l-2 border-gray-100 ml-5 pl-10 pb-6 relative last:border-l-0">
+                  <div className="absolute -left-[21px] top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 bg-primary text-white" aria-hidden>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <label className="text-sm font-bold text-gray-400 uppercase tracking-widest block">Schedule</label>
+                      <div className="bg-white p-1 rounded-full shadow-ios flex scale-90 origin-right shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => { setTimeIsDeparture(true); if (schedules.length > 0) setInputsDirty(true) }}
+                          disabled={loading}
+                          className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${timeIsDeparture ? 'bg-primary text-white' : 'bg-transparent text-gray-400'}`}
+                        >
+                          Departure
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setTimeIsDeparture(false); if (schedules.length > 0) setInputsDirty(true) }}
+                          disabled={loading}
+                          className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${!timeIsDeparture ? 'bg-primary text-white' : 'bg-transparent text-gray-400'}`}
+                        >
+                          Arrival
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="bg-white p-2 rounded-2xl shadow-ios ring-1 ring-gray-100 flex items-center px-4 relative">
+                        <input
+                          type="date"
+                          value={date}
+                          onChange={(e) => { setDate(e.target.value); if (schedules.length > 0) setInputsDirty(true) }}
+                          disabled={loading}
+                          className="w-full bg-transparent border-none py-3 text-sm font-bold text-gray-900 focus:ring-0 outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        />
+                        <span className="text-gray-400 pointer-events-none ml-2" aria-hidden>
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                        </span>
+                      </div>
+                      <div className="bg-white p-2 rounded-2xl shadow-ios ring-1 ring-gray-100 flex items-center px-4 relative">
+                        <input
+                          type="time"
+                          value={time}
+                          onChange={(e) => { setTime(e.target.value); if (schedules.length > 0) setInputsDirty(true) }}
+                          disabled={loading}
+                          className="w-full bg-transparent border-none py-3 text-sm font-bold text-gray-900 focus:ring-0 outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        />
+                        <span className="text-gray-400 pointer-events-none ml-2" aria-hidden>
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Date & time row */}
-                <div className="flex flex-nowrap items-center gap-2 mb-5">
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
+                <div className="pt-6">
+                  <button
+                    type="submit"
                     disabled={loading}
-                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-[#1F1F1F] shadow-sm focus:border-[#FFD56B] focus:ring-2 focus:ring-[#FFD56B] focus:ring-offset-2 focus:outline-none"
-                  />
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    disabled={loading}
-                    className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-[#1F1F1F] shadow-sm focus:border-[#FFD56B] focus:ring-2 focus:ring-[#FFD56B] focus:ring-offset-2 focus:outline-none"
-                  />
+                    className={`w-full py-6 rounded-3xl font-black text-xl uppercase tracking-widest transition-transform shadow-2xl shadow-black/20 active:scale-[0.98] ${loading ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-primary text-white'}`}
+                  >
+                    {loading ? 'Searching…' : 'Find routes'}
+                  </button>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`
-                    w-full h-14 rounded-full font-semibold text-base transition-all
-                    ${loading ? 'bg-[#E8E3DD] text-[#6B6B6B] cursor-not-allowed' : 'bg-[#1F1F1F] text-white shadow-lg hover:bg-[#2A2A2A] hover:shadow-xl active:scale-[0.98]'}
-                  `}
-                >
-                  {loading ? 'Searching…' : 'Find routes'}
-                </button>
               </form>
 
                 {error && (
@@ -841,7 +912,50 @@ export default function App() {
                   </div>
                 )}
 
-                {schedules.length > 0 && (
+                {/* Loading skeleton — Commute Companion style */}
+                {loading && (
+                  <section className="space-y-4 pb-24">
+                    <div className="flex items-center justify-between">
+                      <div className="h-5 w-32 bg-gray-200 rounded-lg animate-pulse" />
+                      <div className="h-4 w-16 bg-gray-200 rounded-lg animate-pulse" />
+                    </div>
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="rounded-3xl bg-white shadow-lg border border-gray-50 p-5">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-7 w-20 bg-gray-200 rounded-lg animate-pulse" />
+                            <div className="h-4 w-24 bg-gray-200 rounded-lg animate-pulse" />
+                          </div>
+                          <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse" />
+                        </div>
+                        <div className="space-y-3">
+                          {[1, 2, 3].map((j) => (
+                            <div key={j} className="flex items-center gap-3">
+                              <div className="h-8 w-14 bg-gray-200 rounded-lg animate-pulse" />
+                              <div className="h-4 flex-1 bg-gray-200 rounded-lg animate-pulse" />
+                              <div className="h-4 w-8 bg-gray-200 rounded-lg animate-pulse" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                )}
+
+                {/* Inputs changed banner — Commute Companion style */}
+                {inputsDirty && schedules.length > 0 && (
+                  <div className="mb-4 flex items-center gap-3 p-3 rounded-2xl bg-[#FFF5D6] border border-[#FFE9A8]">
+                    <svg className="w-[18px] h-[18px] text-[#1F1F1F] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <span className="text-sm text-[#1F1F1F]">Inputs changed — search again to update routes</span>
+                  </div>
+                )}
+
+                {/* Route results — only when not dirty */}
+                {schedules.length > 0 && !loading && !inputsDirty && (
                   <section className="space-y-4 pb-24">
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-bold text-[#1F1F1F]">Available routes</h2>
@@ -857,7 +971,7 @@ export default function App() {
                     ))}
                   </section>
                 )}
-              </div>
+            </main>
             </div>
         )}
         {activeTab === 'explore' && <ExploreTab />}

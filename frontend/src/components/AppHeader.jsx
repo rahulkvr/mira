@@ -12,23 +12,21 @@ function UserIcon({ className }) {
 
 export function AppHeader({ onProfileClick, userName }) {
   return (
-    <header className="sticky top-0 z-40 bg-[#FFF8F0]/95 backdrop-blur-sm px-5 py-4 flex items-center justify-between">
+    <header className="flex justify-between items-center py-8 px-6 max-w-md mx-auto">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#FFE9A8] to-[#FFD56B] flex items-center justify-center">
-          <span className="text-sm font-bold text-[#1F1F1F]">M</span>
-        </div>
-        <span className="text-lg font-bold text-[#1F1F1F]">MIRA</span>
+        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-sm text-gray-900">M</div>
+        <span className="font-bold tracking-tight text-gray-900 uppercase text-xs tracking-[0.2em]">Mira</span>
       </div>
       {onProfileClick && (
         <button
           type="button"
           onClick={onProfileClick}
-          className="flex items-center gap-2 rounded-full bg-white shadow-sm border border-gray-100 px-3 py-2 hover:bg-gray-50 transition-colors"
+          className="p-2 rounded-full bg-white shadow-ios flex items-center gap-2"
           aria-label="Open profile"
         >
-          <UserIcon className="w-[18px] h-[18px] text-gray-600" />
+          <UserIcon className="w-5 h-5 text-gray-600" />
           {userName && (
-            <span className="text-sm font-semibold text-[#1F1F1F] max-w-[120px] truncate">
+            <span className="text-sm font-semibold text-gray-900 max-w-[120px] truncate hidden sm:inline">
               {userName}
             </span>
           )}
