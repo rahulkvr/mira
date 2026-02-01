@@ -157,7 +157,7 @@ export function InterestsScreen({ onComplete, onBack, saving = false, errorMessa
           </button>
         )}
         <h1 className="text-2xl font-bold text-[#1F1F1F] mb-2">What interests you?</h1>
-        <p className="text-sm text-gray-500">Pick at least {MIN_INTERESTS} to personalize your experience. Tap a category to expand.</p>
+        <p className="text-sm text-gray-500"> Pick 3 or more interests to personalize your ride. Tap a category to see what&apos;s inside.</p>
       </div>
 
       {/* Selection counter */}

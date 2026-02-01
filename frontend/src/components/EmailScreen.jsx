@@ -105,9 +105,9 @@ export function EmailScreen({ onContinue, onSkip, onBack, errorMessage }) {
             Back
           </button>
         )}
-        <h1 className="text-2xl font-bold text-[#1F1F1F] mb-2">Enter your email to save</h1>
+        <h1 className="text-2xl font-bold text-[#1F1F1F] mb-2">Pick up right where you left off.</h1>
         <p className="text-sm text-gray-500">
-          We&apos;ll use this to save your preferences and sync across devices.
+          Your favorite routes and morning soundtracks belong to you. Creating an account ensures your setup follows you everywhere, kept exactly how you like it.
         </p>
       </div>
 
