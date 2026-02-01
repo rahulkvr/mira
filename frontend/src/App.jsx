@@ -757,7 +757,7 @@ export default function App() {
   }
 
   if (currentScreen === 'micromaster') {
-    return <MicroMasterScreen onBack={handleMicroMasterBack} />
+    return <MicroMasterScreen onBack={handleMicroMasterBack} apiBase={API_BASE} />
   }
 
   if (currentScreen === 'podcast-loading') {
