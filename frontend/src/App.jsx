@@ -6,9 +6,11 @@ import { SavePlacesScreen } from './components/SavePlacesScreen.jsx'
 import { EmailScreen } from './components/EmailScreen.jsx'
 import { InterestsScreen } from './components/InterestsScreen.jsx'
 import { SuccessScreen } from './components/SuccessScreen.jsx'
+import { PodcastChoiceScreen } from './components/PodcastChoiceScreen.jsx'
 import { PodcastScreen } from './components/PodcastScreen.jsx'
 import { PodcastPlayerPage } from './components/PodcastPlayerPage.jsx'
 import { PodcastLoadingScreen } from './components/PodcastLoadingScreen.jsx'
+import { MicroMasterScreen } from './components/MicroMasterScreen.jsx'
 import { AppHeader } from './components/AppHeader.jsx'
 import { BottomNavigation } from './components/BottomNavigation.jsx'
 import { ExploreTab } from './components/ExploreTab.jsx'
@@ -513,11 +515,19 @@ export default function App() {
 
   const handleSelectRoute = (schedule) => {
     setSelectedSchedule(schedule)
-    setCurrentScreen('podcast')
+    setCurrentScreen('podcast-choice')
+  }
+
+  const handlePodcastChoiceBack = () => {
+    setCurrentScreen('main')
   }
 
   const handlePodcastBack = () => {
-    setCurrentScreen('main')
+    setCurrentScreen('podcast-choice')
+  }
+
+  const handleMicroMasterBack = () => {
+    setCurrentScreen('podcast-choice')
   }
 
   const handleClearPodcast = () => {
@@ -733,6 +743,22 @@ export default function App() {
     })
     return [...names]
   })()
+
+  if (currentScreen === 'podcast-choice') {
+    return (
+      <PodcastChoiceScreen
+        routeSummary={selectedSchedule ? `${startLocationLabel} → ${endLocationLabel}` : null}
+        durationMinutes={selectedSchedule?.time}
+        onSelectGeneratePodcast={() => setCurrentScreen('podcast')}
+        onSelectMicroMaster={() => setCurrentScreen('micromaster')}
+        onBack={handlePodcastChoiceBack}
+      />
+    )
+  }
+
+  if (currentScreen === 'micromaster') {
+    return <MicroMasterScreen onBack={handleMicroMasterBack} />
+  }
 
   if (currentScreen === 'podcast-loading') {
     return <PodcastLoadingScreen />
