@@ -705,11 +705,37 @@ router.post('/podcast', async (req, res) => {
   }
 })
 
+/** Gemini image aspect ratios: "1:1" | "2:3" | "3:2" | "3:4" | "4:3" | "9:16" | "16:9" | "21:9" */
+const GEMINI_ASPECT_RATIOS = [
+  { ratio: 1 / 1, value: '1:1' },
+  { ratio: 2 / 3, value: '2:3' },
+  { ratio: 3 / 2, value: '3:2' },
+  { ratio: 3 / 4, value: '3:4' },
+  { ratio: 4 / 3, value: '4:3' },
+  { ratio: 9 / 16, value: '9:16' },
+  { ratio: 16 / 9, value: '16:9' },
+  { ratio: 21 / 9, value: '21:9' },
+];
+function aspectRatioForScreen(width, height) {
+  if (!width || !height || width <= 0 || height <= 0) return '9:16';
+  const r = width / height;
+  let best = GEMINI_ASPECT_RATIOS[0];
+  let bestDiff = Math.abs(r - best.ratio);
+  for (const entry of GEMINI_ASPECT_RATIOS) {
+    const diff = Math.abs(r - entry.ratio);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = entry;
+    }
+  }
+  return best.value;
+}
+
 /**
  * POST /api/micromaster/generate
- * Body: { topic: string }
+ * Body: { topic: string, width?: number, height?: number }
  * Returns: { topic, slides: [{ title, script, image_base64, audio_base64 }] }
- * Uses Gemini 2.5 Flash (text) for lesson structure, gemini-2.5-flash-image for visuals, ElevenLabs for audio.
+ * Uses Gemini 2.5 Flash (text) for lesson structure, gemini-2.5-flash-image for visuals (aspect from screen size), ElevenLabs for audio.
  */
 router.post('/micromaster/generate', async (req, res) => {
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -723,6 +749,10 @@ router.post('/micromaster/generate', async (req, res) => {
   if (!topic) {
     return res.status(400).json({ error: 'Topic is required. Send { topic: "e.g. JavaScript closures" }.' });
   }
+
+  const screenWidth = Math.max(0, parseInt(req.body?.width, 10) || 0);
+  const screenHeight = Math.max(0, parseInt(req.body?.height, 10) || 0);
+  const imageAspectRatio = aspectRatioForScreen(screenWidth, screenHeight);
 
   try {
     const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -821,7 +851,7 @@ router.post('/micromaster/generate', async (req, res) => {
               contents: [{ role: 'user', parts: [{ text: slide.image_prompt }] }],
               generationConfig: {
                 responseModalities: ['TEXT', 'IMAGE'],
-                imageConfig: { aspectRatio: '9:16' },
+                imageConfig: { aspectRatio: imageAspectRatio },
               },
             },
             { timeout: 60000 }

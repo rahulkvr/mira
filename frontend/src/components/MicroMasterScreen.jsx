@@ -48,10 +48,12 @@ export function MicroMasterScreen({ onBack, apiBase = '' }) {
     setLoading(true)
     setSlides(null)
     try {
+      const width = typeof window !== 'undefined' ? window.innerWidth : 390
+      const height = typeof window !== 'undefined' ? window.innerHeight : 844
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: t }),
+        body: JSON.stringify({ topic: t, width, height }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -81,6 +83,41 @@ export function MicroMasterScreen({ onBack, apiBase = '' }) {
     )
   }
 
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] px-6">
+        <div className="absolute top-20 -right-20 w-72 h-72 rounded-full bg-gradient-to-br from-[#E4F0FF]/40 to-[#C8DFFF]/30 blur-3xl pointer-events-none" aria-hidden />
+        <div className="absolute bottom-32 -left-20 w-64 h-64 rounded-full bg-gradient-to-br from-[#E0F5ED]/30 to-[#B8E8D4]/20 blur-3xl pointer-events-none" aria-hidden />
+
+        <div className="relative z-10 flex flex-col items-center max-w-sm text-center">
+          <div className="relative w-32 h-32 mb-8">
+            <div className="absolute inset-0 rounded-full border-4 border-[#C8DFFF] animate-ping opacity-30" style={{ animationDuration: '1.5s' }} />
+            <div className="absolute inset-0 rounded-full border-4 border-[#2B5A8A]/40 animate-pulse" />
+            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-[#E4F0FF] to-[#8BB8E8] flex items-center justify-center shadow-lg">
+              <GraduationCapIcon className="w-10 h-10 text-[#2B5A8A] animate-pulse" />
+            </div>
+          </div>
+
+          <h2 className="text-xl font-bold text-[#1F1F1F] mb-2">
+            Generating your lesson
+          </h2>
+          <p className="text-sm text-gray-500 mb-1">
+            Creating 5 slides with visuals and audio…
+          </p>
+          <p className="text-xs text-gray-400">
+            This usually takes about a minute
+          </p>
+
+          <div className="flex gap-2 mt-8" aria-hidden>
+            <span className="w-2 h-2 rounded-full bg-[#8BB8E8] animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-2 h-2 rounded-full bg-[#2B5A8A] animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-2 h-2 rounded-full bg-[#1E3A5F] animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] relative">
       <div className="absolute top-0 right-0 w-72 h-72 rounded-full bg-gradient-to-br from-[#E4F0FF]/40 to-[#C8DFFF]/30 blur-3xl pointer-events-none" aria-hidden />
@@ -100,7 +137,7 @@ export function MicroMasterScreen({ onBack, apiBase = '' }) {
           <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#E4F0FF] to-[#C8DFFF] flex items-center justify-center mb-6 shadow-lg">
             <GraduationCapIcon className="w-12 h-12 text-[#2B5A8A]" />
           </div>
-          <h1 className="text-2xl font-bold text-[#1F1F1F] mb-2">MicroMaster</h1>
+          <h1 className="text-2xl font-bold text-[#1F1F1F] mb-2">DoomScroll</h1>
           <p className="text-base text-gray-600 max-w-sm">
             Learn anything in commute-sized lessons. 5 slides, each with a visual and audio.
           </p>
@@ -139,17 +176,9 @@ export function MicroMasterScreen({ onBack, apiBase = '' }) {
                 : 'bg-[#1F1F1F] text-white shadow-lg hover:bg-[#2A2A2A] hover:shadow-xl active:scale-[0.98]'
             }`}
           >
-            {loading ? 'Generating your lesson…' : 'Generate lesson'}
+            Generate lesson
           </button>
         </div>
-
-        {loading && (
-          <div className="mt-8 space-y-3">
-            <div className="h-4 w-3/4 bg-gray-200 rounded-lg animate-pulse" />
-            <div className="h-4 w-1/2 bg-gray-200 rounded-lg animate-pulse" />
-            <div className="h-4 w-2/3 bg-gray-200 rounded-lg animate-pulse" />
-          </div>
-        )}
       </div>
     </div>
   )
