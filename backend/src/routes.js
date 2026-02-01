@@ -222,12 +222,19 @@ async function handleAnnouncements(req, res) {
     } else {
       const from = req.query.from?.trim();
       const to = req.query.to?.trim();
+      const stationsParam = req.query.stations ?? req.query.names;
       if (from || to) {
         const now = new Date();
         options.timeRange = {
           begin: from || now.toISOString(),
           end: to || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         };
+      }
+      if (stationsParam) {
+        const names = typeof stationsParam === 'string'
+          ? stationsParam.split(',').map((s) => s.trim()).filter(Boolean)
+          : Array.isArray(stationsParam) ? stationsParam.map((s) => String(s).trim()).filter(Boolean) : [];
+        if (names.length) options.names = names;
       }
     }
     const data = await getAnnouncements(options);
@@ -270,6 +277,153 @@ async function handleAnnouncements(req, res) {
 
 router.get('/announcements', handleAnnouncements);
 router.post('/announcements', handleAnnouncements);
+
+/**
+ * POST /api/podcast/suggest-topics
+ * Body: { interests?: string[], route_summary?: string, duration_minutes?: number }
+ * Returns: { suggestions: string[] } — 3–5 topic ideas from Gemini (varied, engaging).
+ */
+router.post('/podcast/suggest-topics', async (req, res) => {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    return res.status(500).json({ error: 'Podcast suggestions are not configured.' });
+  }
+  try {
+    const interests = normalizeInterests(req.body?.interests);
+    const routeSummary = (req.body?.route_summary || '').trim();
+    const durationMinutes = clampDuration(req.body?.duration_minutes);
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`;
+
+    const prompt = [
+      'Suggest 3–5 short, engaging podcast topic titles for a commute podcast.',
+      `Trip: ~${durationMinutes} minutes. ${routeSummary ? `Route: ${routeSummary}.` : ''}`,
+      interests.length ? `Listener interests: ${interests.join(', ')}.` : 'General commute audience.',
+      'Make topics varied, timely, and fun — e.g. quick tips, trending angles, or stories that fit the ride. Return valid JSON only: {"suggestions": ["Topic one", "Topic two", ...]}',
+    ].join('\n');
+
+    const { data } = await axios.post(
+      `${geminiEndpoint}?key=${geminiKey}`,
+      {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.8, maxOutputTokens: 512 },
+      },
+      { timeout: 15000 }
+    );
+
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const jsonCandidate = extractJson(rawText);
+    let suggestions = [];
+    if (jsonCandidate) {
+      try {
+        const parsed = JSON.parse(jsonCandidate);
+        if (Array.isArray(parsed?.suggestions)) {
+          suggestions = parsed.suggestions
+            .map((s) => String(s || '').trim())
+            .filter(Boolean)
+            .slice(0, 5);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return res.json({ suggestions });
+  } catch (err) {
+    console.warn('POST /api/podcast/suggest-topics error:', err.message);
+    return res.status(500).json({ error: 'Could not fetch topic suggestions.', suggestions: [] });
+  }
+});
+
+const DEFAULT_INTEREST_SUGGESTIONS = [
+  'ai-news', 'tech-trends', 'music-releases', 'sports', 'science', 'productivity', 'comedy', 'culture',
+];
+
+/**
+ * POST /api/podcast/suggest-interests
+ * Body: { interests?: string[] }
+ * Returns: { suggestions: string[] } — interest tags based on user's interests and what's new in the world.
+ */
+router.post('/podcast/suggest-interests', async (req, res) => {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    console.warn('POST /api/podcast/suggest-interests: GEMINI_API_KEY not set');
+    return res.json({ suggestions: DEFAULT_INTEREST_SUGGESTIONS });
+  }
+  try {
+    const interests = normalizeInterests(req.body?.interests);
+    const model = process.env.GEMINI_INTERESTS_MODEL || process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+    const prompt = [
+      'You suggest podcast interest tags. The user will see these as clickable suggestions to add to their interests.',
+      interests.length
+        ? `User's current interests: ${interests.join(', ')}. Suggest 6–8 NEW interest tags that are related to what is happening RIGHT NOW in the world in those areas: current events, recent news, trending topics, new releases, ongoing stories, or "what\'s new" in tech, music, sports, science, etc. Base suggestions on real recent/current happenings that someone with these interests would care about.`
+        : 'User has no interests yet. Suggest 6–8 varied, popular interest tags that reflect current trends and what people are talking about now (e.g. tech, AI news, music, sports, science, culture).',
+      'Rules: Each tag must be 1–3 words, lowercase, hyphenated for multi-word (e.g. "ai-regulation", "euro-2024", "new-music-releases"). No generic or vague tags. Prefer concrete, timely angles.',
+      'Reply with ONLY a JSON object, no other text or markdown. Example: {"suggestions":["tag-one","tag-two","tag-three","tag-four","tag-five","tag-six"]}',
+    ].join('\n');
+
+    const { data } = await axios.post(
+      `${endpoint}?key=${geminiKey}`,
+      {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 256,
+        },
+      },
+      { timeout: 20000 }
+    );
+
+    const candidate = data?.candidates?.[0];
+    if (!candidate) {
+      console.warn('POST /api/podcast/suggest-interests: no candidates in response', JSON.stringify(data).slice(0, 200));
+      return res.json({ suggestions: DEFAULT_INTEREST_SUGGESTIONS });
+    }
+    if (candidate.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'MAX_TOKENS') {
+      console.warn('POST /api/podcast/suggest-interests: finishReason', candidate.finishReason);
+    }
+
+    let rawText = (candidate?.content?.parts?.[0]?.text || '').trim();
+    if (!rawText) {
+      return res.json({ suggestions: DEFAULT_INTEREST_SUGGESTIONS });
+    }
+
+    const stripMarkdown = (t) => t.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    rawText = stripMarkdown(rawText);
+    const jsonCandidate = extractJson(rawText) || rawText;
+    let suggestions = [];
+    try {
+      const parsed = typeof jsonCandidate === 'string' ? JSON.parse(jsonCandidate) : jsonCandidate;
+      if (Array.isArray(parsed?.suggestions)) {
+        suggestions = parsed.suggestions
+          .map((s) => String(s || '').trim().toLowerCase().replace(/\s+/g, '-'))
+          .filter((s) => s.length > 0 && s.length < 50)
+          .slice(0, 8);
+      }
+    } catch {
+      const arrayMatch = rawText.match(/"suggestions"\s*:\s*\[([\s\S]*?)\]/);
+      if (arrayMatch) {
+        try {
+          const arr = JSON.parse('[' + arrayMatch[1] + ']');
+          suggestions = arr
+            .map((s) => String(s || '').trim().toLowerCase().replace(/\s+/g, '-'))
+            .filter((s) => s.length > 0 && s.length < 50)
+            .slice(0, 8);
+        } catch {
+          // ignore
+        }
+      }
+    }
+    if (suggestions.length === 0) {
+      return res.json({ suggestions: DEFAULT_INTEREST_SUGGESTIONS });
+    }
+    return res.json({ suggestions });
+  } catch (err) {
+    console.warn('POST /api/podcast/suggest-interests error:', err.message, err.response?.data ? err.response.data : '');
+    return res.json({ suggestions: DEFAULT_INTEREST_SUGGESTIONS });
+  }
+});
 
 function clampDuration(value) {
   const parsed = Number(value)
@@ -322,6 +476,70 @@ function splitIntoChunks(text, targetChunkChars = 500) {
   return chunks
 }
 
+/** Parse Geofox-style time { date: "DD.MM.YYYY", time: "HH:mm" } to minutes since midnight (for relative segment calc). */
+function parseTimeToMinutes(t) {
+  if (!t || !t.time) return null
+  const [h, m] = String(t.time).trim().split(':').map(Number)
+  if (Number.isNaN(h)) return null
+  return (h || 0) * 60 + (Number.isNaN(m) ? 0 : m)
+}
+
+/**
+ * Build segment timeline from journey: each segment gets startMin and endMin (trip-relative minutes).
+ * Uses dep/arr times if present and parseable; otherwise distributes total_minutes by element count.
+ */
+function buildSegmentTimeline(journey) {
+  const elements = journey?.schedule_elements
+  const totalMin = Math.max(1, Number(journey?.total_minutes) || 0)
+  if (!Array.isArray(elements) || elements.length === 0) {
+    return []
+  }
+  const withMinutes = elements.map((el) => {
+    const dep = parseTimeToMinutes(el.dep_time)
+    const arr = parseTimeToMinutes(el.arr_time)
+    const duration = dep != null && arr != null ? Math.max(0, arr - dep) : null
+    return { ...el, _durationMin: duration }
+  })
+  const hasTimes = withMinutes.every((el) => el._durationMin != null)
+  if (hasTimes) {
+    const firstDep = parseTimeToMinutes(elements[0]?.dep_time)
+    if (firstDep == null) return distributeEvenly(elements, totalMin)
+    let cur = 0
+    return withMinutes.map((el) => {
+      const startMin = Math.round(cur)
+      const dur = el._durationMin ?? 0
+      cur += dur
+      return { ...el, startMin, endMin: Math.round(cur) }
+    })
+  }
+  return distributeEvenly(elements, totalMin)
+}
+
+function distributeEvenly(elements, totalMin) {
+  const n = elements.length
+  const each = totalMin / n
+  return elements.map((el, i) => ({
+    ...el,
+    startMin: Math.round(i * each),
+    endMin: Math.round((i + 1) * each),
+  }))
+}
+
+/** Local time context string (morning/afternoon/evening) from ISO or date. */
+function getTimeOfDayContext(localTimeStr) {
+  if (!localTimeStr) return ''
+  let date
+  if (typeof localTimeStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(localTimeStr)) {
+    date = new Date(localTimeStr)
+  } else {
+    date = new Date()
+  }
+  const h = date.getHours()
+  if (h < 12) return 'Morning'
+  if (h < 17) return 'Afternoon'
+  return 'Evening'
+}
+
 router.post('/podcast', async (req, res) => {
   const geminiKey = process.env.GEMINI_API_KEY
   const elevenKey = process.env.ELEVENLABS_API_KEY
@@ -330,23 +548,52 @@ router.post('/podcast', async (req, res) => {
   }
 
   try {
-    const durationMinutes = clampDuration(req.body?.route_duration_minutes)
+    const journey = req.body?.journey
+    const durationMinutes = clampDuration(
+      journey?.total_minutes ?? req.body?.route_duration_minutes
+    )
     const interests = normalizeInterests(req.body?.interests)
     const topicOverride = (req.body?.topic_override || '').trim()
     const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
     const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
 
-    const numSections = Math.min(3, Math.max(2, Math.ceil(durationMinutes / 4)))
+    const numSections = Math.min(6, Math.max(2, Math.ceil(durationMinutes / 3)))
     const wordsPerSection = Math.ceil((durationMinutes * 140) / numSections)
 
+    const segments = journey ? buildSegmentTimeline(journey) : []
+    const startName = journey?.start_name || 'start'
+    const destName = journey?.dest_name || 'destination'
+    const timeOfDay = getTimeOfDayContext(journey?.local_time)
+
+    const segmentLines = segments.map(
+      (s) =>
+        `- From ${s.from_name || '?'} to ${s.to_name || '?'}, line ${s.line_name || '?'} (${s.line_type_short || 'transit'}), trip minutes ${s.startMin ?? 0}–${s.endMin ?? 0}`
+    )
+    const journeyBlock =
+      segmentLines.length > 0
+        ? [
+            `The listener's journey: ${startName} → ${destName}.`,
+            'Segment timeline (weave these into the script at the right moments):',
+            ...segmentLines,
+            timeOfDay ? `Current time of day: ${timeOfDay}.` : '',
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : ''
+
     const prompt = [
-      'You are a calm, friendly podcast host. Create a commute podcast script.',
-      `Total length: ~${durationMinutes} minutes. Split into exactly ${numSections} sections.`,
-      `Each section: ~${wordsPerSection} words. Interests: ${interests.length ? interests.join(', ') : 'general commute, light news, mindful focus'}.`,
+      'You are a high-energy, warm, and really friendly podcast host. Never sound boring, dull, or monotone. Sound like an enthusiastic friend on the commute — fun and lively, not calm or meditative. Be upbeat, engaging, and conversational.',
+      `Create a commute podcast script that fills the whole trip. Total length: ~${durationMinutes} minutes. Split into exactly ${numSections} sections.`,
+      `Each section: ~${wordsPerSection} words. Total script must match the trip duration. Interests: ${interests.length ? interests.join(', ') : 'general commute, light news, mindful focus'}.`,
       topicOverride ? `Topic: "${topicOverride}".` : 'Suggest a topic that fits the interests.',
+      journeyBlock
+        ? `${journeyBlock}\nWeave in the journey: mention the start, each leg (line and stations), and destination. Align section content with segments (e.g. "as you leave X on the S1…", "when you reach Y…").`
+        : '',
       'Return valid JSON only: {"topic":"...","sections":["section1 text","section2 text",...]}',
-      'The script should be soothing. No markdown, no extra formatting.',
-    ].join('\n')
+      'No markdown, no extra formatting.',
+    ]
+      .filter(Boolean)
+      .join('\n')
 
     const geminiResponse = await axios.post(
       `${geminiEndpoint}?key=${geminiKey}`,
@@ -395,7 +642,7 @@ router.post('/podcast', async (req, res) => {
     }
     if (sections.length === 0) {
       sections = [
-        `Welcome to your commute. Today we'll take a short calming break. Breathe in, breathe out. You've got this.`,
+        `Hey, welcome to your ride! Let's make this trip fly. You've got this — here we go!`,
       ]
     }
 
@@ -406,6 +653,7 @@ router.post('/podcast', async (req, res) => {
       accept: 'audio/mpeg',
       'content-type': 'application/json',
     }
+    const voiceSettings = { stability: 0.35, similarity_boost: 0.8 }
 
     const ttsResults = []
     for (const text of sections) {
@@ -414,7 +662,7 @@ router.post('/podcast', async (req, res) => {
         {
           text: text.slice(0, 5000),
           model_id: ttsModel,
-          voice_settings: { stability: 0.5, similarity_boost: 0.8 },
+          voice_settings: voiceSettings,
           optimize_streaming_latency: 4,
         },
         {
@@ -456,5 +704,178 @@ router.post('/podcast', async (req, res) => {
     return res.status(500).json({ error: String(msg).slice(0, 300) || 'Failed to generate podcast audio.' })
   }
 })
+
+/**
+ * POST /api/micromaster/generate
+ * Body: { topic: string }
+ * Returns: { topic, slides: [{ title, script, image_base64, audio_base64 }] }
+ * Uses Gemini 2.5 Flash (text) for lesson structure, gemini-2.5-flash-image for visuals, ElevenLabs for audio.
+ */
+router.post('/micromaster/generate', async (req, res) => {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const elevenKey = process.env.ELEVENLABS_API_KEY;
+  const geminiImageModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
+  if (!geminiKey || !elevenKey) {
+    return res.status(500).json({ error: 'MicroMaster is not configured. GEMINI_API_KEY and ELEVENLABS_API_KEY required.' });
+  }
+
+  const topic = (req.body?.topic || '').trim();
+  if (!topic) {
+    return res.status(400).json({ error: 'Topic is required. Send { topic: "e.g. JavaScript closures" }.' });
+  }
+
+  try {
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`;
+
+    const structurePrompt = [
+      `Create exactly 5 bite-sized lesson slides for the topic: "${topic}".`,
+      'Each slide: title (short, 3-8 words), script (1-2 sentences for text-to-speech, ~20-30 sec), image_prompt (one clear sentence describing a visual for AI image generation, educational style, no text in image).',
+      'Keep scripts and image_prompts concise so all 5 slides fit in one response.',
+    ].join('\n');
+
+    const slidesSchema = {
+      type: 'object',
+      properties: {
+        slides: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Short slide title, 3-8 words' },
+              script: { type: 'string', description: '1-2 sentences for TTS, ~20-30 sec' },
+              image_prompt: { type: 'string', description: 'One-sentence visual description for AI image' },
+            },
+            required: ['title', 'script', 'image_prompt'],
+          },
+          minItems: 5,
+          maxItems: 5,
+        },
+      },
+      required: ['slides'],
+    };
+
+    let geminiResponse;
+    try {
+      geminiResponse = await axios.post(
+        `${geminiEndpoint}?key=${geminiKey}`,
+        {
+          contents: [{ role: 'user', parts: [{ text: structurePrompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 16384,
+            responseMimeType: 'application/json',
+            responseJsonSchema: slidesSchema,
+          },
+        },
+        { timeout: 60000 }
+      );
+    } catch (geminiErr) {
+      throw geminiErr;
+    }
+
+    const rawText = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const finishReason = geminiResponse.data?.candidates?.[0]?.finishReason;
+    if (finishReason === 'SAFETY') {
+      throw new Error('Content blocked by safety filters. Try a different topic.');
+    }
+    const jsonCandidate = extractJson(rawText);
+    let slides = [];
+    if (jsonCandidate) {
+      try {
+        const parsed = JSON.parse(jsonCandidate);
+        const rawSlides = Array.isArray(parsed?.slides) ? parsed.slides : [];
+        const slidesBeforeFilter = rawSlides.slice(0, 5).map((s) => ({
+          title: String(s?.title || '').trim() || 'Slide',
+          script: String(s?.script || '').trim() || '',
+          image_prompt: String(s?.image_prompt || '').trim() || '',
+        }));
+        slides = slidesBeforeFilter.filter((s) => s.script && s.image_prompt);
+      } catch {
+        // fallback
+      }
+    }
+    if (slides.length === 0) {
+      throw new Error('Could not generate lesson structure. Please try a different topic.');
+    }
+
+    const geminiImageEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${geminiImageModel}:generateContent`;
+    const voiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
+    const ttsModel = process.env.ELEVENLABS_MODEL || 'eleven_flash_v2_5';
+    const ttsHeaders = {
+      'xi-api-key': elevenKey,
+      accept: 'audio/mpeg',
+      'content-type': 'application/json',
+    };
+    const voiceSettings = { stability: 0.35, similarity_boost: 0.8 };
+
+    const enrichedSlides = await Promise.all(
+      slides.map(async (slide, i) => {
+        let imageBase64 = '';
+        let audioBase64 = '';
+
+        const [imgResult, ttsResult] = await Promise.allSettled([
+          axios.post(
+            `${geminiImageEndpoint}?key=${geminiKey}`,
+            {
+              contents: [{ role: 'user', parts: [{ text: slide.image_prompt }] }],
+              generationConfig: {
+                responseModalities: ['TEXT', 'IMAGE'],
+                imageConfig: { aspectRatio: '9:16' },
+              },
+            },
+            { timeout: 60000 }
+          ),
+          slide.script
+            ? axios.post(
+                `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+                {
+                  text: slide.script.slice(0, 5000),
+                  model_id: ttsModel,
+                  voice_settings: voiceSettings,
+                  optimize_streaming_latency: 4,
+                },
+                { headers: ttsHeaders, responseType: 'arraybuffer', timeout: 45000 }
+              )
+            : Promise.resolve(null),
+        ]);
+
+        if (imgResult.status === 'fulfilled') {
+          const parts = imgResult.value?.data?.candidates?.[0]?.content?.parts || [];
+          for (const part of parts) {
+            if (part.inlineData?.data) {
+              imageBase64 = part.inlineData.data;
+              break;
+            }
+          }
+        } else {
+          console.warn(`MicroMaster image ${i + 1} failed:`, imgResult.reason?.message);
+        }
+
+        if (ttsResult.status === 'fulfilled' && ttsResult.value?.data) {
+          audioBase64 = Buffer.from(ttsResult.value.data).toString('base64');
+        } else if (slide.script && ttsResult.status === 'rejected') {
+          console.warn(`MicroMaster TTS ${i + 1} failed:`, ttsResult.reason?.message);
+        }
+
+        return {
+          title: slide.title,
+          script: slide.script,
+          image_base64: imageBase64 || null,
+          audio_base64: audioBase64 || null,
+        };
+      })
+    );
+
+    return res.json({
+      topic,
+      slides: enrichedSlides,
+    });
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.message || 'Failed to generate MicroMaster lesson.';
+    console.error('POST /api/micromaster/generate error:', msg);
+    return res.status(500).json({ error: String(msg).slice(0, 300) });
+  }
+});
 
 export default router;
