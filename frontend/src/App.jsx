@@ -7,6 +7,8 @@ import { EmailScreen } from './components/EmailScreen.jsx'
 import { InterestsScreen } from './components/InterestsScreen.jsx'
 import { SuccessScreen } from './components/SuccessScreen.jsx'
 import { PodcastScreen } from './components/PodcastScreen.jsx'
+import { PodcastPlayerPage } from './components/PodcastPlayerPage.jsx'
+import { PodcastLoadingScreen } from './components/PodcastLoadingScreen.jsx'
 import { AppHeader } from './components/AppHeader.jsx'
 import { BottomNavigation } from './components/BottomNavigation.jsx'
 import { ExploreTab } from './components/ExploreTab.jsx'
@@ -15,7 +17,8 @@ import { useAuth } from './contexts/AuthContext.jsx'
 import { hasSupabaseConfig, supabase } from './lib/supabase.js'
 import { savePodcastAudio } from './lib/podcastCache.js'
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
+const rawApiUrl = import.meta.env.VITE_API_URL || ''
+const API_BASE = rawApiUrl && !/^https?:\/\//i.test(rawApiUrl) ? `http://${rawApiUrl}` : rawApiUrl
 // Set to true to always show welcome on load (for editing). Set to false and use key below to show once.
 const ALWAYS_SHOW_WELCOME = true
 const WELCOME_DONE_KEY = 'mira_welcome_done'
@@ -51,9 +54,9 @@ function suggestedTopic(interests, durationMinutes) {
   const cleaned = (interests || []).map(formatInterestLabel).filter(Boolean)
   const focus = cleaned.slice(0, 2)
   if (focus.length > 0) {
-    return `${safeDuration}-minute calm episode on ${focus.join(' and ')}`
+    return `${safeDuration}-minute fun episode on ${focus.join(' and ')}`
   }
-  return `${safeDuration}-minute calm commute companion`
+  return `${safeDuration}-minute energetic commute companion`
 }
 
 function base64ToBlob(base64, contentType) {
@@ -517,6 +520,15 @@ export default function App() {
     setCurrentScreen('main')
   }
 
+  const handleClearPodcast = () => {
+    if (podcastAudioUrl) URL.revokeObjectURL(podcastAudioUrl)
+    setPodcastAudioUrl('')
+    setPodcastScript('')
+    setPodcastTopic(suggestedTopic(userInterests, selectedSchedule?.time))
+    setPodcastError('')
+    setPodcastOfflineReady(false)
+  }
+
   const startLocationLabel = selectedLabel(startSelected) || startQuery.trim() || 'Current location'
   const endLocationLabel = selectedLabel(endSelected) || endQuery.trim() || 'Destination'
 
@@ -524,12 +536,30 @@ export default function App() {
     if (!selectedSchedule) return
     setPodcastError('')
     setPodcastLoading(true)
+    setCurrentScreen('podcast-loading')
 
     const durationMinutes = Math.max(1, Math.round(selectedSchedule.time || DEFAULT_PODCAST_MIN))
+    const elements = selectedSchedule.scheduleElements || []
+    const scheduleElements = elements.map((el) => ({
+      from_name: el.from?.name ?? '',
+      to_name: el.to?.name ?? '',
+      line_name: el.line?.name ?? '',
+      line_type_short: el.line?.type?.shortInfo ?? el.line?.type?.longInfo ?? 'transit',
+      dep_time: el.from?.depTime ?? null,
+      arr_time: el.to?.arrTime ?? null,
+    }))
+    const journey = {
+      start_name: startLocationLabel,
+      dest_name: endLocationLabel,
+      schedule_elements: scheduleElements,
+      total_minutes: durationMinutes,
+      local_time: new Date().toISOString(),
+    }
     const payload = {
       interests: userInterests,
       route_duration_minutes: durationMinutes,
       topic_override: podcastTopic?.trim(),
+      journey,
     }
 
     try {
@@ -541,6 +571,7 @@ export default function App() {
       const data = await res.json()
       if (!res.ok) {
         setPodcastError(data.error || 'Could not generate podcast. Please try again.')
+        setCurrentScreen('podcast')
         setPodcastLoading(false)
         return
       }
@@ -583,8 +614,11 @@ export default function App() {
       } catch {
         setPodcastOfflineReady(false)
       }
+
+      setCurrentScreen('podcast-player')
     } catch (err) {
       setPodcastError(err.message || 'Network error. Please try again.')
+      setCurrentScreen('podcast')
     } finally {
       setPodcastLoading(false)
     }
@@ -687,6 +721,37 @@ export default function App() {
     )
   }
 
+  const routeStations = (() => {
+    if (!selectedSchedule) return []
+    const names = new Set()
+    const s = selectedSchedule
+    if (s.start?.name) names.add(String(s.start.name).trim())
+    if (s.dest?.name) names.add(String(s.dest.name).trim())
+    ;(s.scheduleElements || []).forEach((el) => {
+      if (el.from?.name) names.add(String(el.from.name).trim())
+      if (el.to?.name) names.add(String(el.to.name).trim())
+    })
+    return [...names]
+  })()
+
+  if (currentScreen === 'podcast-loading') {
+    return <PodcastLoadingScreen />
+  }
+
+  if (currentScreen === 'podcast-player') {
+    return (
+      <PodcastPlayerPage
+        audioUrl={podcastAudioUrl}
+        routeSummary={`${startLocationLabel} → ${endLocationLabel}`}
+        scheduleElements={selectedSchedule?.scheduleElements ?? []}
+        durationMinutes={selectedSchedule?.time}
+        routeStations={routeStations}
+        apiBase={API_BASE}
+        onBack={() => setCurrentScreen('podcast')}
+      />
+    )
+  }
+
   if (currentScreen === 'podcast') {
     return (
       <PodcastScreen
@@ -694,6 +759,9 @@ export default function App() {
         topic={podcastTopic}
         onTopicChange={setPodcastTopic}
         onGenerate={handleGeneratePodcast}
+        onClearPodcast={handleClearPodcast}
+        onListenNow={() => setCurrentScreen('podcast-player')}
+        onInterestsChange={setUserInterests}
         generating={podcastLoading}
         errorMessage={podcastError}
         audioUrl={podcastAudioUrl}
@@ -702,6 +770,9 @@ export default function App() {
         routeSummary={`${startLocationLabel} → ${endLocationLabel}`}
         offlineReady={podcastOfflineReady}
         script={podcastScript}
+        routeStations={routeStations}
+        apiBase={API_BASE}
+        scheduleElements={selectedSchedule?.scheduleElements ?? []}
       />
     )
   }
