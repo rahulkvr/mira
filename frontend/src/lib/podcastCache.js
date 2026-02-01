@@ -32,17 +32,13 @@ export async function savePodcastAudio(key, blob) {
 }
 
 export async function getPodcastAudio(key) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const db = await openDb()
-      const tx = db.transaction(STORE_NAME, 'readonly')
-      const store = tx.objectStore(STORE_NAME)
-      const request = store.get(key)
-      request.onsuccess = () => resolve(request.result || null)
-      request.onerror = () => reject(request.error)
-    } catch (err) {
-      reject(err)
-    }
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const store = tx.objectStore(STORE_NAME)
+    const request = store.get(key)
+    request.onsuccess = () => resolve(request.result || null)
+    request.onerror = () => reject(request.error)
   })
 }
 

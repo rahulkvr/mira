@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
       mounted = false
       listener?.subscription?.unsubscribe()
     }
-  }, [hasSupabaseConfig])
+  }, [])
 
   const value = useMemo(() => {
     return {
@@ -68,11 +68,12 @@ export function AuthProvider({ children }) {
         return supabase.auth.signOut()
       },
     }
-  }, [session, loading, hasSupabaseConfig])
+  }, [session, loading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- useAuth is the standard co-located hook for AuthContext
 export function useAuth() {
   return useContext(AuthContext)
 }
