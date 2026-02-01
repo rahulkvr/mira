@@ -94,7 +94,7 @@ export function PodcastChoiceScreen({ routeSummary, durationMinutes, onSelectGen
             <ChevronRightIcon className="w-6 h-6 text-gray-400 shrink-0 group-hover:text-[#1F1F1F] transition-colors" />
           </button>
 
-          {/* Card 2: MicroMaster */}
+          {/* Card 2: DoomScroll */}
           <button
             type="button"
             onClick={onSelectMicroMaster}
@@ -104,7 +104,7 @@ export function PodcastChoiceScreen({ routeSummary, durationMinutes, onSelectGen
               <GraduationCapIcon className="w-8 h-8 text-[#2B5A8A]" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold text-[#1F1F1F] mb-1">MicroMaster</h2>
+              <h2 className="text-lg font-bold text-[#1F1F1F] mb-1">DoomScroll</h2>
               <p className="text-sm text-gray-500">
                 Learn anything in commute-sized lessons.
               </p>

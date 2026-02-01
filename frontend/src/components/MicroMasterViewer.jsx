@@ -91,13 +91,24 @@ export function MicroMasterViewer({ slides = [], topic: _topic = '', onBack }) {
               data-slide-index={i}
               className="min-h-dvh min-h-screen w-full snap-start snap-always shrink-0 relative flex flex-col justify-end"
             >
-              <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{
-                  backgroundImage: imageUrl || 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #1a1a2e 100%)',
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              <div className="absolute inset-0 flex items-center justify-center bg-[#1a1a2e]">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt=""
+                    className="w-full h-full object-contain"
+                    style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  />
+                ) : (
+                  <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{
+                      backgroundImage: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #1a1a2e 100%)',
+                    }}
+                  />
+                )}
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
               <div className="relative z-10 px-6 pb-16 pt-8">
                 <p className="text-xs font-semibold text-white/70 uppercase tracking-widest mb-1">
                   {i + 1} / {slides.length}
